@@ -1,0 +1,16 @@
+{
+  "name": "aleman-admin-bot",
+  "version": "1.0.0",
+  "main": "telegram.js",
+  "scripts": {
+    "start": "NODE_ENV=production node utils/telegram.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.61.0",
+    "mongoose": "^8.9.3",
+    "axios": "^1.7.9"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+} 
