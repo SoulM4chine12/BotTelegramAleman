@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 // Mantener todas las constantes necesarias, solo remover SecurityBlock
-const { Key, User, Stats, conectarDB } = require('./database');
+const { Key, User, Stats, conectarDB, getLastKeys } = require('./database');
 
 const TELEGRAM_CONFIG = {
     // Bot administrativo
@@ -393,16 +393,16 @@ const adminCommands = {
     },
     '/keys': async (msg) => {
         try {
-            const keys = await Key.find().sort({ createdAt: -1 }).limit(10);
+            const keys = await getLastKeys(10);
             
             const keyList = keys.map(key => 
                 `🔑 *Key:* \`${key.key}\`\n` +
                 `📅 Creada: ${key.createdAt.toLocaleString()}\n` +
                 `⌛ Expira: ${key.expiresAt.toLocaleString()}\n` +
-                `✨ Estado: ${key.used ? 'Utilizada' : 'Disponible'}\n` +
-                `👤 Usuario: ${key.usedBy || 'N/A'}\n` +
-                `👨‍💻 Creada por: ${key.createdBy?.adminUsername || 'N/A'}\n` +
-                `🆔 Admin ID: ${key.createdBy?.adminId || 'N/A'}\n`
+                `✨ Estado: ${key.estado}\n` +
+                `👤 Usuario: ${key.usedBy || 'Sin usar'}\n` +
+                `👨‍💻 Creada por: ${key.createdBy?.adminUsername || 'Sistema'}\n` +
+                `🆔 Admin ID: ${key.createdBy?.adminId || 'Sistema'}\n`
             ).join('\n');
 
             const mensaje = `📋 *Últimas 10 Keys*\n\n${keyList}`;
@@ -411,6 +411,7 @@ const adminCommands = {
                 parse_mode: 'Markdown'
             });
         } catch (error) {
+            console.error('Error en /keys:', error);
             adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo keys');
         }
     },

@@ -202,11 +202,24 @@ async function getLastKeys(limit = 5) {
         const keys = await Key.aggregate([
             { $sort: { createdAt: -1 } },
             { $limit: limit },
+            // Lookup para obtener info del usuario que usa la key
             {
                 $lookup: {
                     from: 'users',
-                    localField: 'key',
-                    foreignField: 'key',
+                    let: { keyValue: '$key' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: { $eq: ['$key', '$$keyValue'] }
+                            }
+                        },
+                        {
+                            $project: {
+                                username: 1,
+                                _id: 0
+                            }
+                        }
+                    ],
                     as: 'userInfo'
                 }
             },
@@ -219,7 +232,7 @@ async function getLastKeys(limit = 5) {
                     createdBy: 1,
                     estado: {
                         $cond: {
-                            if: { $gt: [{ $size: '$userInfo' }, 0] },
+                            if: '$used',
                             then: 'Utilizada',
                             else: 'Disponible'
                         }
@@ -228,7 +241,7 @@ async function getLastKeys(limit = 5) {
                         $cond: {
                             if: { $gt: [{ $size: '$userInfo' }, 0] },
                             then: { $arrayElemAt: ['$userInfo.username', 0] },
-                            else: 'N/A'
+                            else: 'Sin usar'
                         }
                     }
                 }
