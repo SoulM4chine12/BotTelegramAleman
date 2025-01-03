@@ -288,25 +288,52 @@ async function getStats() {
         const stats = await Stats.findOne({});
         
         if (!stats) {
-            console.log('⚠️ No hay stats, creando nuevas...');
             return {
-                activeUsers: [],
-                totalChecks: 0,
-                lives: 0,
-                lastUpdate: new Date(),
-                serverStatus: {
-                    memory: process.memoryUsage().heapUsed,
-                    cpu: require('os').loadavg()[0],
-                    uptime: process.uptime()
-                }
+                message: '📊 Estadísticas del Sistema\n\n' +
+                        '👥 Usuarios Activos: 0\n' +
+                        '📈 Total Checks: 0\n' +
+                        '✅ Lives Encontradas: 0\n\n' +
+                        '🖥️ Estado del Servidor:\n' +
+                        '- Memoria: 0MB\n' +
+                        '- CPU: 0%\n' +
+                        '- Uptime: 0h 0m\n\n' +
+                        `⏰ Última Actualización: ${new Date().toLocaleString()}`
             };
         }
 
-        console.log('✅ Stats obtenidas:', stats);
-        return stats;
+        // Formatear números
+        const formatNumber = num => num?.toLocaleString() || 0;
+        
+        // Formatear memoria
+        const formatMemory = bytes => {
+            const mb = Math.round(bytes / 1024 / 1024);
+            return `${mb}MB`;
+        };
+
+        // Formatear uptime
+        const formatUptime = seconds => {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            return `${hours}h ${minutes}m`;
+        };
+
+        return {
+            message: '📊 Estadísticas del Sistema\n\n' +
+                    `👥 Usuarios Activos: ${stats.activeUsers?.length || 0}\n` +
+                    `📈 Total Checks: ${formatNumber(stats.totalChecks)}\n` +
+                    `✅ Lives Encontradas: ${formatNumber(stats.lives)}\n\n` +
+                    '🖥️ Estado del Servidor:\n' +
+                    `- Memoria: ${formatMemory(stats.serverStatus?.memory)}\n` +
+                    `- CPU: ${Math.round(stats.serverStatus?.cpu || 0)}%\n` +
+                    `- Uptime: ${formatUptime(stats.serverStatus?.uptime)}\n\n` +
+                    `⏰ Última Actualización: ${stats.lastUpdate?.toLocaleString()}`
+        };
+
     } catch (error) {
         console.error('❌ Error obteniendo stats:', error);
-        throw error;
+        return {
+            message: '❌ Error obteniendo estadísticas'
+        };
     }
 }
 
