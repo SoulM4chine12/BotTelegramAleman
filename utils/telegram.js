@@ -313,29 +313,79 @@ const adminCommands = {
     },
     '/genkey': async (msg, args) => {
         try {
-            const days = parseInt(args[0]) || 30; // Por defecto 30 días
+            let days;
+            const option = args[0]?.toLowerCase();
+
+            // Opciones predefinidas
+            switch (option) {
+                case '15':
+                    days = 15;
+                    break;
+                case '30':
+                    days = 30;
+                    break;
+                case '60':
+                    days = 60;
+                    break;
+                case 'h':
+                case 'horas':
+                    // Si es por horas, convertir a días (ej: /genkey h 12)
+                    const hours = parseInt(args[1]) || 1;
+                    days = hours / 24;
+                    break;
+                case 'd':
+                case 'dias':
+                    // Días personalizados (ej: /genkey d 5)
+                    days = parseInt(args[1]) || 1;
+                    break;
+                default:
+                    // Si es un número directo
+                    days = parseInt(option) || 30;
+            }
+
             const key = crypto.randomBytes(16).toString('hex').toUpperCase();
             
-            // Crear nueva key en MongoDB
             const newKey = new Key({
                 key: key,
                 createdAt: new Date(),
                 expiresAt: new Date(Date.now() + (days * 24 * 60 * 60 * 1000)),
-                status: 'unused',
-                createdBy: 'admin-bot'
+                daysValidity: days,
+                createdBy: {
+                    adminId: msg.from.id.toString(),
+                    adminUsername: msg.from.username,
+                    adminName: msg.from.first_name
+                }
             });
 
             await newKey.save();
 
+            // Formatear duración para el mensaje
+            let duracionMsg;
+            if (days < 1) {
+                duracionMsg = `${Math.round(days * 24)} horas`;
+            } else {
+                duracionMsg = `${days} días`;
+            }
+
             const mensaje = `🔑 *Nueva Key Generada*\n\n` +
                 `📌 Key: \`${key}\`\n` +
-                `⏰ Duración: ${days} días\n` +
+                `⏰ Duración: ${duracionMsg}\n` +
                 `📅 Expira: ${newKey.expiresAt.toLocaleString()}\n` +
-                `✨ Estado: Sin usar`;
+                `✨ Estado: Disponible\n` +
+                `👨‍💻 Creada por: @${msg.from.username}\n` +
+                `🆔 Admin ID: ${msg.from.id}`;
 
-            adminBot.sendMessage(msg.chat.id, mensaje, {
-                parse_mode: 'Markdown'
-            });
+            // Actualizar el mensaje de ayuda para mostrar el nuevo formato
+            const helpMsg = `*Uso del comando:*\n` +
+                `/genkey 15 - Key de 15 días\n` +
+                `/genkey 30 - Key de 30 días\n` +
+                `/genkey 60 - Key de 60 días\n` +
+                `/genkey h 12 - Key por horas (ej: 12 horas)\n` +
+                `/genkey d 5 - Key por días específicos (ej: 5 días)`;
+
+            await adminBot.sendMessage(msg.chat.id, mensaje, { parse_mode: 'Markdown' });
+            await adminBot.sendMessage(msg.chat.id, helpMsg, { parse_mode: 'Markdown' });
+
         } catch (error) {
             adminBot.sendMessage(msg.chat.id, '❌ Error generando key');
             console.error('Error generando key:', error);
@@ -347,9 +397,12 @@ const adminCommands = {
             
             const keyList = keys.map(key => 
                 `🔑 *Key:* \`${key.key}\`\n` +
-                `📅 Expira: ${key.expiresAt.toLocaleString()}\n` +
-                `✨ Estado: ${key.status}\n` +
-                `👤 Usuario: ${key.usedBy || 'N/A'}\n`
+                `📅 Creada: ${key.createdAt.toLocaleString()}\n` +
+                `⌛ Expira: ${key.expiresAt.toLocaleString()}\n` +
+                `✨ Estado: ${key.used ? 'Utilizada' : 'Disponible'}\n` +
+                `👤 Usuario: ${key.usedBy || 'N/A'}\n` +
+                `👨‍💻 Creada por: ${key.createdBy?.adminUsername || 'N/A'}\n` +
+                `🆔 Admin ID: ${key.createdBy?.adminId || 'N/A'}\n`
             ).join('\n');
 
             const mensaje = `📋 *Últimas 10 Keys*\n\n${keyList}`;

@@ -83,6 +83,12 @@ const keySchema = new mongoose.Schema({
     expiresAt: {
         type: Date,
         required: true
+    },
+    // Agregar información del admin
+    createdBy: {
+        adminId: String,        // ID de Telegram del admin
+        adminUsername: String,  // @username del admin
+        adminName: String      // Nombre del admin
     }
 });
 
@@ -193,15 +199,41 @@ async function getLastKeys(limit = 5) {
     try {
         console.log('🔄 Obteniendo últimas keys de Atlas...');
         
-        // Asegurar conexión a Atlas
-        if (mongoose.connection.readyState !== 1) {
-            await conectarDB();
-        }
-
-        const keys = await Key.find({})
-            .sort({ createdAt: -1 })
-            .limit(limit)
-            .lean();
+        const keys = await Key.aggregate([
+            { $sort: { createdAt: -1 } },
+            { $limit: limit },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'key',
+                    foreignField: 'key',
+                    as: 'userInfo'
+                }
+            },
+            {
+                $project: {
+                    key: 1,
+                    createdAt: 1,
+                    expiresAt: 1,
+                    daysValidity: 1,
+                    createdBy: 1,
+                    estado: {
+                        $cond: {
+                            if: { $gt: [{ $size: '$userInfo' }, 0] },
+                            then: 'Utilizada',
+                            else: 'Disponible'
+                        }
+                    },
+                    usedBy: {
+                        $cond: {
+                            if: { $gt: [{ $size: '$userInfo' }, 0] },
+                            then: { $arrayElemAt: ['$userInfo.username', 0] },
+                            else: 'N/A'
+                        }
+                    }
+                }
+            }
+        ]);
 
         console.log(`✅ Últimas ${limit} keys obtenidas de Atlas`);
         return keys;
