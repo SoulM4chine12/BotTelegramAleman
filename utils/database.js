@@ -5,6 +5,8 @@ const MONGODB_URI = 'mongodb+srv://alemanApp:ALEMAN1988@alemanchecker.rhsbg.mong
 
 // Agregamos retry y timeout options
 const MONGODB_OPTIONS = {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
     serverSelectionTimeoutMS: 5000,
     retryWrites: true,
     retryReads: true
