@@ -1,9 +1,7 @@
 const mongoose = require('mongoose');
 
 // Configuración de conexiones
-const MONGODB_URI = process.env.NODE_ENV === 'production' 
-    ? process.env.MONGODB_URI || 'mongodb+srv://alemanApp:<db_password>@alemanchecker.rhsbg.mongodb.net/?retryWrites=true&w=majority&appName=AlemanChecker'
-    : 'mongodb://alemanApp:ALEMAN1988@127.0.0.1:27017/alemanChecker?authSource=alemanChecker';
+const MONGODB_URI = 'mongodb+srv://alemanApp:ALEMAN1988@alemanchecker.rhsbg.mongodb.net/alemanChecker?retryWrites=true&w=majority&appName=AlemanChecker';
 
 // Agregamos retry y timeout options
 const MONGODB_OPTIONS = {
@@ -175,10 +173,192 @@ const Stats = mongoose.model('Stats', StatsSchema);
 const User = mongoose.model('User', userSchema, 'users');
 const Key = mongoose.model('Key', keySchema, 'keys');
 
+// Funciones para Keys
+async function generateKey(days) {
+    try {
+        console.log('🔄 Bot Telegram: Generando nueva key...');
+        const crypto = require('crypto');
+        const key = crypto.randomBytes(16).toString('hex').toUpperCase();
+        
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + days);
+
+        const newKey = new Key({
+            key: key,
+            daysValidity: days,
+            expiresAt: expiresAt,
+            createdAt: new Date()
+        });
+
+        console.log('💾 Intentando guardar key en MongoDB...');
+        const savedKey = await newKey.save();
+        console.log('✅ Key guardada exitosamente:', savedKey);
+
+        return savedKey;
+    } catch (error) {
+        console.error('❌ Error generando key:', error);
+        throw error;
+    }
+}
+
+async function getLastKeys(limit = 5) {
+    return await Key.find({}).sort({ createdAt: -1 }).limit(limit);
+}
+
+async function getAllKeys() {
+    return await Key.find({}).sort({ createdAt: -1 });
+}
+
+async function deleteKey(key) {
+    return await Key.deleteOne({ key: key });
+}
+
+// Funciones para Usuarios
+async function getActiveUsers() {
+    return await User.find({ 
+        'subscription.status': 'active',
+        'blockStatus.isBlocked': false 
+    });
+}
+
+async function getAllUsers() {
+    return await User.find({}).sort({ createdAt: -1 });
+}
+
+// Funciones de Bloqueo
+async function blockUser(username, duration, reason) {
+    try {
+        console.log(`🚫 Intentando bloquear usuario: ${username}`);
+        const blockUntil = new Date();
+        
+        switch (duration) {
+            case '24h': blockUntil.setHours(blockUntil.getHours() + 24); break;
+            case '48h': blockUntil.setHours(blockUntil.getHours() + 48); break;
+            case 'week': blockUntil.setDate(blockUntil.getDate() + 7); break;
+            case 'permanent': blockUntil.setFullYear(blockUntil.getFullYear() + 100); break;
+            default: throw new Error('Duración inválida');
+        }
+
+        const result = await User.updateOne(
+            { username },
+            {
+                $set: {
+                    'blockStatus.isBlocked': true,
+                    'blockStatus.reason': reason,
+                    'blockStatus.blockedAt': new Date(),
+                    'blockStatus.blockedUntil': blockUntil,
+                    'blockStatus.blockType': duration
+                }
+            }
+        );
+
+        return result.modifiedCount > 0;
+    } catch (error) {
+        console.error('❌ Error bloqueando usuario:', error);
+        throw error;
+    }
+}
+
+async function unblockUser(username) {
+    try {
+        console.log(`🔓 Intentando desbloquear usuario: ${username}`);
+        const result = await User.updateOne(
+            { username },
+            {
+                $set: {
+                    'blockStatus.isBlocked': false,
+                    'blockStatus.reason': null,
+                    'blockStatus.blockedAt': null,
+                    'blockStatus.blockedUntil': null,
+                    'blockStatus.blockType': null
+                }
+            }
+        );
+        return result.modifiedCount > 0;
+    } catch (error) {
+        console.error('❌ Error desbloqueando usuario:', error);
+        throw error;
+    }
+}
+
+// Funciones de Estadísticas
+async function getStats() {
+    try {
+        console.log('📊 Bot Telegram: Obteniendo stats...');
+        const stats = await Stats.findOne({});
+        
+        if (!stats) {
+            console.log('⚠️ No hay stats, creando nuevas...');
+            return {
+                activeUsers: [],
+                totalChecks: 0,
+                lives: 0,
+                lastUpdate: new Date(),
+                serverStatus: {
+                    memory: process.memoryUsage().heapUsed,
+                    cpu: require('os').loadavg()[0],
+                    uptime: process.uptime()
+                }
+            };
+        }
+
+        console.log('✅ Stats obtenidas:', stats);
+        return stats;
+    } catch (error) {
+        console.error('❌ Error obteniendo stats:', error);
+        throw error;
+    }
+}
+
+async function updateStats(data) {
+    try {
+        console.log('📊 Bot Telegram: Actualizando stats...');
+        
+        await Stats.findOneAndUpdate(
+            {}, // Documento único
+            {
+                activeUsers: Array.from(global.activeUsers.keys()),
+                totalChecks: data.totalChecks,
+                lives: data.lives,
+                lastUpdate: new Date(),
+                serverStatus: {
+                    memory: process.memoryUsage().heapUsed,
+                    cpu: require('os').loadavg()[0],
+                    uptime: process.uptime()
+                }
+            },
+            { upsert: true }
+        );
+
+        console.log('✅ Stats actualizadas correctamente');
+    } catch (error) {
+        console.error('❌ Error actualizando stats:', error);
+        throw error;
+    }
+}
+
+// Funciones de Seguridad
+async function getSecurityLogs() {
+    return await SecurityBlock.find({})
+        .sort({ blockedAt: -1 })
+        .limit(10);
+}
+
 module.exports = {
+    conectarDB,
     User,
     Key,
     Stats,
     SecurityBlock,
-    conectarDB
+    generateKey,
+    getLastKeys,
+    getAllKeys,
+    deleteKey,
+    getActiveUsers,
+    getAllUsers,
+    blockUser,
+    unblockUser,
+    getStats,
+    updateStats,
+    getSecurityLogs
 }; 
