@@ -73,7 +73,6 @@ const securityConfig = {
         /hack/i,
         /inject/i,
         /script/i,
-        /\/?../i,  // Path traversal
         /'|"|`/    // SQL injection
     ]
 };
@@ -250,28 +249,21 @@ const adminCommands = {
     '/stats': async (msg) => {
         try {
             // Leer stats de MongoDB
-            const stats = await Stats.findOne({});
+            const stats = await Stats.findOne({}).sort({ lastUpdate: -1 });
             
-            // Si no hay stats en MongoDB, mostrar stats locales
             if (!stats) {
-                const localStats = {
-                    usuarios: global.activeUsers.size,
-                    checkerActivo: global.checkerActivo,
-                    gate: global.currentGate
-                };
-
+                // Si no hay stats, mostrar stats básicas
                 const mensaje = `📊 *Estadísticas del Checker*\n\n` +
-                    `👥 Usuarios Activos: ${localStats.usuarios}\n` +
-                    `🔄 Checker: ${localStats.checkerActivo ? '✅ Activo' : '❌ Inactivo'}\n` +
-                    `🌐 Gate: ${localStats.gate || 'N/A'}`;
+                    `👥 Usuarios Activos: ${global.activeUsers?.size || 0}\n` +
+                    `🔄 Total Checks: 0\n` +
+                    `✅ Lives: 0\n` +
+                    `⏰ Sin actividad registrada`;
 
-                adminBot.sendMessage(msg.chat.id, mensaje, {
+                return adminBot.sendMessage(msg.chat.id, mensaje, {
                     parse_mode: 'Markdown'
                 });
-                return;
             }
 
-            // Si hay stats en MongoDB, mostrar stats completas
             const mensaje = `📊 *Estadísticas del Checker*\n\n` +
                 `👥 Usuarios Activos: ${stats.activeUsers.length}\n` +
                 `🔄 Total Checks: ${stats.totalChecks}\n` +

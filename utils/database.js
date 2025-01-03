@@ -2,23 +2,18 @@ const mongoose = require('mongoose');
 
 // Configuración de conexiones
 const MONGODB_URI = process.env.NODE_ENV === 'production' 
-    ? 'mongodb+srv://alemanApp:ALEMAN1988@alemanchecker.rhsbg.mongodb.net/alemanChecker?retryWrites=true&w=majority&appName=AlemanChecker'
+    ? 'mongodb://alemanApp:ALEMAN1988@127.0.0.1:27017/alemanChecker?authSource=admin'
     : 'mongodb://localhost:27017/alemanChecker';
 
-const MONGODB_OPTIONS = process.env.NODE_ENV === 'production' 
-    ? {
-        useNewUrlParser: true,
-        useUnifiedTopology: true
-    }
-    : {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        auth: {
-            username: 'alemanApp',
-            password: 'ALEMAN1988'
-        },
-        authSource: 'alemanChecker'
-    };
+const MONGODB_OPTIONS = {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    auth: {
+        username: 'alemanApp',
+        password: 'ALEMAN1988'
+    },
+    authSource: 'alemanChecker'
+};
 
 // Función para conectar a MongoDB
 async function conectarDB() {
@@ -166,5 +161,6 @@ const Key = mongoose.model('Key', keySchema, 'keys');
 module.exports = {
     User,
     Key,
+    SecurityBlock,
     conectarDB
 }; 
