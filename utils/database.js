@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 // Configuración de conexiones
 const MONGODB_URI = process.env.NODE_ENV === 'production' 
-    ? process.env.MONGODB_URI || 'mongodb+srv://alemanApp:<db_password>@alemanchecker.rhsbg.mongodb.net/alemanChecker?retryWrites=true&w=majority'
+    ? process.env.MONGODB_URI || 'mongodb+srv://alemanApp:<db_password>@alemanchecker.rhsbg.mongodb.net/?retryWrites=true&w=majority&appName=AlemanChecker'
     : 'mongodb://alemanApp:ALEMAN1988@127.0.0.1:27017/alemanChecker?authSource=alemanChecker';
 
 // Agregamos retry y timeout options
