@@ -142,20 +142,6 @@ userSchema.methods.checkBlockStatus = function() {
     return { blocked: false };
 };
 
-// Schema para bloqueos de seguridad
-const SecurityBlockSchema = new mongoose.Schema({
-    userId: String,
-    username: String,
-    reason: String,
-    blockedAt: Date,
-    expires: Date,
-    attackType: String,
-    attempts: Number,
-    ip: String
-});
-
-const SecurityBlock = mongoose.model('SecurityBlock', SecurityBlockSchema);
-
 // Crear schema para estadísticas
 const StatsSchema = new mongoose.Schema({
     activeUsers: [String],
@@ -301,22 +287,17 @@ async function unblockUser(username) {
     try {
         console.log(`🔓 Intentando desbloquear usuario: ${username}`);
         
-        // Primero, obtener el usuario
-        const user = await User.findOne({ username });
-        if (!user) {
-            console.log('❌ Usuario no encontrado');
-            return false;
-        }
-
         // Actualizar directamente el documento
         const result = await User.updateOne(
             { username },
             {
                 $set: {
-                    forceClose: false,
-                    blockStatus: {
-                        isBlocked: false
-                    }
+                    'blockStatus.isBlocked': false,
+                    'blockStatus.reason': null,
+                    'blockStatus.blockedAt': null,
+                    'blockStatus.blockedUntil': null,
+                    'blockStatus.blockType': null,
+                    'forceClose': false
                 }
             }
         );
@@ -417,19 +398,11 @@ async function updateStats(data) {
     }
 }
 
-// Funciones de Seguridad
-async function getSecurityLogs() {
-    return await SecurityBlock.find({})
-        .sort({ blockedAt: -1 })
-        .limit(10);
-}
-
 module.exports = {
     conectarDB,
     User,
     Key,
     Stats,
-    SecurityBlock,
     generateKey,
     getLastKeys,
     getAllKeys,
@@ -439,6 +412,5 @@ module.exports = {
     blockUser,
     unblockUser,
     getStats,
-    updateStats,
-    getSecurityLogs
+    updateStats
 }; 
