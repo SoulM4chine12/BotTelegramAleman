@@ -4,7 +4,8 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { Key, User, Stats, SecurityBlock, conectarDB } = require('./database');
+// Mantener todas las constantes necesarias, solo remover SecurityBlock
+const { Key, User, Stats, conectarDB } = require('./database');
 
 const TELEGRAM_CONFIG = {
     // Bot administrativo
@@ -540,6 +541,7 @@ const adminCommands = {
                 return;
             }
 
+            // Actualizar directamente en el documento encontrado
             user.blockStatus = {
                 isBlocked: false,
                 reason: null,
@@ -547,11 +549,12 @@ const adminCommands = {
                 blockedUntil: null,
                 blockType: null
             };
-
+            user.forceClose = false;
+            
             await user.save();
 
             adminBot.sendMessage(msg.chat.id, 
-                `✅ Usuario ${username} desbloqueado correctamente`, {
+                `✅ Usuario ${username} desbloqueado correctamente\n\nforceClose: ${user.forceClose}`, {
                 parse_mode: 'Markdown'
             });
 

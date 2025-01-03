@@ -292,6 +292,11 @@ async function unblockUser(username) {
             { username },
             { 
                 $set: {
+                    'blockStatus.isBlocked': false,
+                    'blockStatus.reason': null,
+                    'blockStatus.blockedAt': null,
+                    'blockStatus.blockedUntil': null,
+                    'blockStatus.blockType': null,
                     forceClose: false
                 }
             }
@@ -301,6 +306,17 @@ async function unblockUser(username) {
             console.log('✅ Usuario desbloqueado completamente');
             return true;
         } else {
+            // Intentar actualizar solo forceClose si el primer intento falló
+            const forceCloseResult = await User.updateOne(
+                { username },
+                { $set: { forceClose: false } }
+            );
+            
+            if (forceCloseResult.modifiedCount > 0) {
+                console.log('✅ ForceClose actualizado correctamente');
+                return true;
+            }
+            
             console.log('❌ No se pudo actualizar el usuario');
             return false;
         }
