@@ -4,7 +4,7 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { Key, User } = require('./database');
+const { Key, User, Stats, SecurityBlock } = require('./database');
 
 const TELEGRAM_CONFIG = {
     // Bot administrativo
@@ -125,26 +125,59 @@ function detectAttack(message, userId) {
 }
 
 // Función para bloquear usuarios
-function blockUser(userId) {
-    securityConfig.blockedUsers.set(userId, {
-        blockedAt: Date.now(),
-        expires: Date.now() + securityConfig.blockDuration
-    });
+async function blockUser(userId, username, reason = 'Intento de ataque', ip = 'Unknown') {
+    try {
+        const block = new SecurityBlock({
+            userId,
+            username,
+            reason,
+            blockedAt: new Date(),
+            expires: new Date(Date.now() + securityConfig.blockDuration),
+            attackType: reason,
+            attempts: 1,
+            ip
+        });
 
-    // Notificar bloqueo
-    const blockMsg = `⛔ *Usuario Bloqueado*\n\n` +
-        `🆔 ID: ${userId}\n` +
-        `⏰ Duración: 1 hora\n` +
-        `📅 Fecha: ${new Date().toLocaleString()}`;
+        await block.save();
 
-    adminBot.sendMessage(TELEGRAM_CONFIG.adminId, blockMsg, {
-        parse_mode: 'Markdown'
-    });
+        const blockMsg = `⛔ *Usuario Bloqueado*\n\n` +
+            `🆔 ID: ${userId}\n` +
+            `👤 Usuario: ${username}\n` +
+            `⏰ Duración: 1 hora\n` +
+            `📝 Razón: ${reason}\n` +
+            `🌐 IP: ${ip}\n` +
+            `📅 Fecha: ${new Date().toLocaleString()}`;
+
+        adminBot.sendMessage(TELEGRAM_CONFIG.adminId, blockMsg, {
+            parse_mode: 'Markdown'
+        });
+    } catch (error) {
+        console.error('Error guardando bloqueo:', error);
+    }
+}
+
+// Función para verificar si un usuario está bloqueado
+async function isBlocked(userId) {
+    try {
+        const block = await SecurityBlock.findOne({
+            userId,
+            expires: { $gt: new Date() }
+        });
+        return !!block;
+    } catch (error) {
+        console.error('Error verificando bloqueo:', error);
+        return false;
+    }
 }
 
 // Modificar el listener de mensajes del bot principal
 adminBot.on('message', async (msg) => {
     const userId = msg.from.id.toString();
+
+    // Verificar bloqueo en MongoDB
+    if (await isBlocked(userId)) {
+        return;
+    }
 
     // Verificar si está bloqueado
     const blocked = securityConfig.blockedUsers.get(userId);
@@ -215,20 +248,47 @@ const adminCommands = {
         });
     },
     '/stats': async (msg) => {
-        const stats = {
-            usuarios: global.activeUsers.size,
-            checkerActivo: global.checkerActivo,
-            gate: global.currentGate
-        };
+        try {
+            // Leer stats de MongoDB
+            const stats = await Stats.findOne({});
+            
+            // Si no hay stats en MongoDB, mostrar stats locales
+            if (!stats) {
+                const localStats = {
+                    usuarios: global.activeUsers.size,
+                    checkerActivo: global.checkerActivo,
+                    gate: global.currentGate
+                };
 
-        const mensaje = `📊 *Estadísticas del Checker*\n\n` +
-            `👥 Usuarios Activos: ${stats.usuarios}\n` +
-            `🔄 Checker: ${stats.checkerActivo ? '✅ Activo' : '❌ Inactivo'}\n` +
-            `🌐 Gate: ${stats.gate || 'N/A'}`;
+                const mensaje = `📊 *Estadísticas del Checker*\n\n` +
+                    `👥 Usuarios Activos: ${localStats.usuarios}\n` +
+                    `🔄 Checker: ${localStats.checkerActivo ? '✅ Activo' : '❌ Inactivo'}\n` +
+                    `🌐 Gate: ${localStats.gate || 'N/A'}`;
 
-        adminBot.sendMessage(msg.chat.id, mensaje, {
-            parse_mode: 'Markdown'
-        });
+                adminBot.sendMessage(msg.chat.id, mensaje, {
+                    parse_mode: 'Markdown'
+                });
+                return;
+            }
+
+            // Si hay stats en MongoDB, mostrar stats completas
+            const mensaje = `📊 *Estadísticas del Checker*\n\n` +
+                `👥 Usuarios Activos: ${stats.activeUsers.length}\n` +
+                `🔄 Total Checks: ${stats.totalChecks}\n` +
+                `✅ Lives: ${stats.lives}\n` +
+                `⏰ Última Actualización: ${stats.lastUpdate.toLocaleString()}\n\n` +
+                `💻 *Estado del Servidor*\n` +
+                `🧠 Memoria: ${Math.round(stats.serverStatus.memory / 1024 / 1024)}MB\n` +
+                `⚡ CPU: ${stats.serverStatus.cpu.toFixed(2)}%\n` +
+                `⌛ Uptime: ${Math.round(stats.serverStatus.uptime / 3600)}h`;
+
+            adminBot.sendMessage(msg.chat.id, mensaje, {
+                parse_mode: 'Markdown'
+            });
+        } catch (error) {
+            console.error('Error obteniendo stats:', error);
+            adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo estadísticas');
+        }
     },
     '/help': (msg) => {
         const help = `🤖 *Comandos Administrativos*\n\n` +
@@ -408,19 +468,19 @@ const adminCommands = {
 
             switch (blockType) {
                 case '24h':
-                    blockDuration = 24 * 60 * 60 * 1000; // 24 horas
+                    blockDuration = 24 * 60 * 60 * 1000;
                     blockMessage = '24 horas';
                     break;
                 case '48h':
-                    blockDuration = 48 * 60 * 60 * 1000; // 48 horas
+                    blockDuration = 48 * 60 * 60 * 1000;
                     blockMessage = '48 horas';
                     break;
                 case 'week':
-                    blockDuration = 7 * 24 * 60 * 60 * 1000; // 1 semana
+                    blockDuration = 7 * 24 * 60 * 60 * 1000;
                     blockMessage = '1 semana';
                     break;
                 case 'permanent':
-                    blockDuration = null; // Bloqueo permanente
+                    blockDuration = null;
                     blockMessage = 'permanentemente';
                     break;
                 default:
@@ -434,6 +494,7 @@ const adminCommands = {
                 return;
             }
 
+            // Actualizar estado de bloqueo
             user.blockStatus = {
                 isBlocked: true,
                 reason,
@@ -441,15 +502,17 @@ const adminCommands = {
                 blockedUntil: blockDuration ? new Date(Date.now() + blockDuration) : null,
                 blockType
             };
-
+            
+            // Forzar cierre de la aplicación
+            user.forceClose = true;
             await user.save();
 
-            // Notificar bloqueo
             const mensaje = `🚫 *Usuario Bloqueado*\n\n` +
                 `👤 Usuario: ${username}\n` +
                 `⏰ Duración: ${blockMessage}\n` +
                 `📅 Hasta: ${user.blockStatus.blockedUntil?.toLocaleString() || 'Permanente'}\n` +
-                `📝 Razón: ${reason}`;
+                `📝 Razón: ${reason}\n` +
+                `🔄 Acción: Se cerrará la aplicación del usuario`;
 
             adminBot.sendMessage(msg.chat.id, mensaje, {
                 parse_mode: 'Markdown'
@@ -517,21 +580,31 @@ adminBot.on('message', (msg) => {
 adminBot.onText(/\/security/, async (msg) => {
     if (msg.from.id.toString() !== TELEGRAM_CONFIG.adminId) return;
 
-    const blockedList = Array.from(securityConfig.blockedUsers.entries())
-        .map(([userId, data]) => {
-            const timeLeft = Math.ceil((data.expires - Date.now()) / 60000);
-            return `👤 *Usuario:* ${userId}\n` +
-                   `⏰ Bloqueado hace: ${Math.floor((Date.now() - data.blockedAt) / 60000)}min\n` +
-                   `⌛ Tiempo restante: ${timeLeft}min\n`;
-        }).join('\n');
+    try {
+        const blocks = await SecurityBlock.find({
+            expires: { $gt: new Date() }  // Solo bloqueos activos
+        }).sort({ blockedAt: -1 });
 
-    const mensaje = `🛡️ *Reporte de Seguridad*\n\n` +
-        `📊 Usuarios bloqueados: ${securityConfig.blockedUsers.size}\n\n` +
-        (blockedList || 'No hay usuarios bloqueados');
+        const blockedList = blocks.map(block => 
+            `👤 *Usuario:* ${block.username || block.userId}\n` +
+            `⏰ Bloqueado: ${block.blockedAt.toLocaleString()}\n` +
+            `⌛ Expira: ${block.expires.toLocaleString()}\n` +
+            `📝 Razón: ${block.reason}\n` +
+            `🔄 Intentos: ${block.attempts}\n` +
+            `🌐 IP: ${block.ip}\n`
+        ).join('\n');
 
-    adminBot.sendMessage(msg.chat.id, mensaje, {
-        parse_mode: 'Markdown'
-    });
+        const mensaje = `🛡️ *Reporte de Seguridad*\n\n` +
+            `📊 Usuarios bloqueados: ${blocks.length}\n\n` +
+            (blockedList || 'No hay usuarios bloqueados');
+
+        adminBot.sendMessage(msg.chat.id, mensaje, {
+            parse_mode: 'Markdown'
+        });
+    } catch (error) {
+        console.error('Error obteniendo reporte:', error);
+        adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo reporte de seguridad');
+    }
 });
 
 // Agregar el servidor HTTP para mantenerlo activo en hosting

@@ -56,6 +56,10 @@ const userSchema = new mongoose.Schema({
             type: String,
             enum: ['24h', '48h', 'week', 'permanent']
         }
+    },
+    forceClose: {
+        type: Boolean,
+        default: false
     }
 });
 
@@ -140,6 +144,20 @@ userSchema.methods.checkBlockStatus = function() {
 
     return { blocked: false };
 };
+
+// Schema para bloqueos de seguridad
+const SecurityBlockSchema = new mongoose.Schema({
+    userId: String,
+    username: String,
+    reason: String,
+    blockedAt: Date,
+    expires: Date,
+    attackType: String,
+    attempts: Number,
+    ip: String
+});
+
+const SecurityBlock = mongoose.model('SecurityBlock', SecurityBlockSchema);
 
 // Definir los modelos en alemanChecker
 const User = mongoose.model('User', userSchema, 'users');
