@@ -639,12 +639,13 @@ process.on('unhandledRejection', (err) => {
 // Al inicio, después de inicializar el bot
 async function initializeBot() {
     try {
-        // Primero conectar a MongoDB
-        const connected = await conectarDB();
-        if (!connected) {
+        console.log('🤖 Bot Administrativo iniciado en modo', process.env.NODE_ENV || 'desarrollo');
+        
+        // Intentar conectar a MongoDB
+        const dbConnected = await conectarDB();
+        if (!dbConnected) {
             throw new Error('No se pudo conectar a MongoDB');
         }
-        console.log('✅ Conectado a MongoDB');
 
         // Luego iniciar el bot
         return initBot();
