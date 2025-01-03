@@ -161,16 +161,34 @@ async function blockUser(userId, username, reason = 'Intento de ataque', ip = 'U
 // Función para verificar si un usuario está bloqueado
 async function isBlocked(userId) {
     try {
-        const block = await SecurityBlock.findOne({
-            userId,
-            expires: { $gt: new Date() }
+        // Asegurar conexión a la base de datos
+        await conectarDB();
+
+        const user = await User.findOne({ 
+            'blockStatus.isBlocked': true,
+            userId: userId 
         });
-        return !!block;
+
+        return user ? true : false;
+
     } catch (error) {
         console.error('Error verificando bloqueo:', error);
         return false;
     }
 }
+
+// Middleware para verificar bloqueos
+adminBot.use(async (ctx, next) => {
+    try {
+        if (await isBlocked(ctx.from.id)) {
+            return ctx.reply('❌ Usuario bloqueado');
+        }
+        return next();
+    } catch (error) {
+        console.error('Error en middleware de bloqueo:', error);
+        return next();
+    }
+});
 
 // Modificar el listener de mensajes del bot principal
 adminBot.on('message', async (msg) => {
