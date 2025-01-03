@@ -204,11 +204,47 @@ async function generateKey(days) {
 }
 
 async function getLastKeys(limit = 5) {
-    return await Key.find({}).sort({ createdAt: -1 }).limit(limit);
+    try {
+        console.log('🔄 Obteniendo últimas keys de Atlas...');
+        
+        // Asegurar conexión a Atlas
+        if (mongoose.connection.readyState !== 1) {
+            await conectarDB();
+        }
+
+        const keys = await Key.find({})
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .lean();
+
+        console.log(`✅ Últimas ${limit} keys obtenidas de Atlas`);
+        return keys;
+    } catch (error) {
+        console.error('❌ Error obteniendo últimas keys:', error);
+        return [];
+    }
 }
 
 async function getAllKeys() {
-    return await Key.find({}).sort({ createdAt: -1 });
+    try {
+        console.log('🔄 Obteniendo todas las keys de Atlas...');
+        
+        // Asegurar conexión a Atlas
+        if (mongoose.connection.readyState !== 1) {
+            await conectarDB();
+        }
+
+        // Obtener solo las keys de Atlas
+        const keys = await Key.find({})
+            .sort({ createdAt: -1 })
+            .lean(); // Para mejor rendimiento
+
+        console.log(`✅ Keys encontradas en Atlas: ${keys.length}`);
+        return keys;
+    } catch (error) {
+        console.error('❌ Error obteniendo keys:', error);
+        return [];
+    }
 }
 
 async function deleteKey(key) {
@@ -264,6 +300,8 @@ async function blockUser(username, duration, reason) {
 async function unblockUser(username) {
     try {
         console.log(`🔓 Intentando desbloquear usuario: ${username}`);
+        
+        // Actualizar todos los campos de bloqueo y forceClose
         const result = await User.updateOne(
             { username },
             {
@@ -272,11 +310,25 @@ async function unblockUser(username) {
                     'blockStatus.reason': null,
                     'blockStatus.blockedAt': null,
                     'blockStatus.blockedUntil': null,
-                    'blockStatus.blockType': null
+                    'blockStatus.blockType': null,
+                    'forceClose': false  // También resetear forceClose
+                },
+                $unset: {  // Eliminar campos completamente
+                    'blockStatus.reason': "",
+                    'blockStatus.blockedAt': "",
+                    'blockStatus.blockedUntil': "",
+                    'blockStatus.blockType': ""
                 }
             }
         );
-        return result.modifiedCount > 0;
+
+        if (result.modifiedCount > 0) {
+            console.log('✅ Usuario desbloqueado completamente');
+            return true;
+        } else {
+            console.log('❌ No se encontró el usuario o ya estaba desbloqueado');
+            return false;
+        }
     } catch (error) {
         console.error('❌ Error desbloqueando usuario:', error);
         throw error;
