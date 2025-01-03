@@ -4,7 +4,7 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { Key, User, Stats, SecurityBlock } = require('./database');
+const { Key, User, Stats, SecurityBlock, conectarDB } = require('./database');
 
 const TELEGRAM_CONFIG = {
     // Bot administrativo
