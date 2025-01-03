@@ -2,9 +2,7 @@ const mongoose = require('mongoose');
 
 // Configuración de conexiones
 const MONGODB_URI = process.env.NODE_ENV === 'production' 
-    ? (process.env.MONGODB_URI?.startsWith('mongodb://') 
-        ? process.env.MONGODB_URI 
-        : 'mongodb://alemanApp:ALEMAN1988@190.120.250.85:27017/alemanChecker?authSource=alemanChecker')
+    ? process.env.MONGODB_URI || 'mongodb+srv://alemanApp:<db_password>@alemanchecker.rhsbg.mongodb.net/alemanChecker?retryWrites=true&w=majority'
     : 'mongodb://alemanApp:ALEMAN1988@127.0.0.1:27017/alemanChecker?authSource=alemanChecker';
 
 // Agregamos retry y timeout options
@@ -18,11 +16,11 @@ const MONGODB_OPTIONS = {
 async function conectarDB() {
     try {
         console.log('🔄 Intentando conectar a MongoDB...');
-        if (!MONGODB_URI.startsWith('mongodb://')) {
+        if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+srv://')) {
             throw new Error('Invalid MongoDB URI format');
         }
         await mongoose.connect(MONGODB_URI, MONGODB_OPTIONS);
-        console.log('✅ Conectado a MongoDB:', process.env.NODE_ENV === 'production' ? 'Producción' : 'Local');
+        console.log('✅ Conectado a MongoDB:', process.env.NODE_ENV === 'production' ? 'Atlas' : 'Local');
         return true;
     } catch (error) {
         console.error('❌ Error conectando a MongoDB:', error);
