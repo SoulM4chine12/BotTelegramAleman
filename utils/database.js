@@ -287,17 +287,12 @@ async function unblockUser(username) {
     try {
         console.log(`🔓 Intentando desbloquear usuario: ${username}`);
         
-        // Actualizar directamente el documento
+        // Actualizar y limpiar completamente el estado de bloqueo
         const result = await User.updateOne(
             { username },
-            {
+            { 
                 $set: {
-                    'blockStatus.isBlocked': false,
-                    'blockStatus.reason': null,
-                    'blockStatus.blockedAt': null,
-                    'blockStatus.blockedUntil': null,
-                    'blockStatus.blockType': null,
-                    'forceClose': false
+                    forceClose: false
                 }
             }
         );
