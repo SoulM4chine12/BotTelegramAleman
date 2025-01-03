@@ -301,23 +301,22 @@ async function unblockUser(username) {
     try {
         console.log(`🔓 Intentando desbloquear usuario: ${username}`);
         
-        // Actualizar todos los campos de bloqueo y forceClose
+        // Primero, obtener el usuario
+        const user = await User.findOne({ username });
+        if (!user) {
+            console.log('❌ Usuario no encontrado');
+            return false;
+        }
+
+        // Actualizar directamente el documento
         const result = await User.updateOne(
             { username },
             {
                 $set: {
-                    'blockStatus.isBlocked': false,
-                    'blockStatus.reason': null,
-                    'blockStatus.blockedAt': null,
-                    'blockStatus.blockedUntil': null,
-                    'blockStatus.blockType': null,
-                    'forceClose': false  // También resetear forceClose
-                },
-                $unset: {  // Eliminar campos completamente
-                    'blockStatus.reason': "",
-                    'blockStatus.blockedAt': "",
-                    'blockStatus.blockedUntil': "",
-                    'blockStatus.blockType': ""
+                    forceClose: false,
+                    blockStatus: {
+                        isBlocked: false
+                    }
                 }
             }
         );
@@ -326,7 +325,7 @@ async function unblockUser(username) {
             console.log('✅ Usuario desbloqueado completamente');
             return true;
         } else {
-            console.log('❌ No se encontró el usuario o ya estaba desbloqueado');
+            console.log('❌ No se pudo actualizar el usuario');
             return false;
         }
     } catch (error) {
