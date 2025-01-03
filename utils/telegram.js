@@ -18,6 +18,9 @@ const TELEGRAM_CONFIG = {
 // Crear una única instancia del bot
 let adminBot = null;
 
+// Al inicio del archivo
+global.activeUsers = new Map();
+
 // Función para inicializar el bot solo si no existe
 function initBot() {
     if (!adminBot) {
@@ -233,18 +236,23 @@ adminBot.onText(/\/start/, (msg) => {
 // Comandos administrativos
 const adminCommands = {
     '/users': async (msg) => {
-        const activeUsers = global.activeUsers;
-        const mensaje = `👥 *Usuarios Activos (${activeUsers.size})*\n\n` +
-            Array.from(activeUsers.entries())
-                .map(([user, lastActivity]) => {
-                    const time = new Date(lastActivity).toLocaleString();
-                    return `👤 *${user}*\n└ Última actividad: ${time}`;
-                })
-                .join('\n\n');
-        
-        adminBot.sendMessage(msg.chat.id, mensaje || '❌ No hay usuarios activos', {
-            parse_mode: 'Markdown'
-        });
+        try {
+            const activeUsers = global.activeUsers;
+            const mensaje = `👥 *Usuarios Activos (${activeUsers.size})*\n\n` +
+                Array.from(activeUsers.entries())
+                    .map(([user, lastActivity]) => {
+                        const time = new Date(lastActivity).toLocaleString();
+                        return `👤 *${user}*\n└ Última actividad: ${time}`;
+                    })
+                    .join('\n\n');
+            
+            adminBot.sendMessage(msg.chat.id, mensaje || '❌ No hay usuarios activos', {
+                parse_mode: 'Markdown'
+            });
+        } catch (error) {
+            console.error('Error en /users:', error);
+            adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo usuarios');
+        }
     },
     '/stats': async (msg) => {
         try {
@@ -627,6 +635,35 @@ process.on('unhandledRejection', (err) => {
         { parse_mode: 'Markdown' }
     ).catch(() => {});
 });
+
+// Al inicio, después de inicializar el bot
+async function initializeBot() {
+    try {
+        // Primero conectar a MongoDB
+        const connected = await conectarDB();
+        if (!connected) {
+            throw new Error('No se pudo conectar a MongoDB');
+        }
+        console.log('✅ Conectado a MongoDB');
+
+        // Luego iniciar el bot
+        return initBot();
+    } catch (error) {
+        console.error('❌ Error inicializando:', error);
+        throw error;
+    }
+}
+
+// Inicializar el bot solo después de conectar a MongoDB
+let botInstance = null;
+(async () => {
+    try {
+        botInstance = await initializeBot();
+    } catch (error) {
+        console.error('Error fatal:', error);
+        process.exit(1);
+    }
+})();
 
 module.exports = {
     TELEGRAM_CONFIG,

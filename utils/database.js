@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 // Configuración de conexiones
 const MONGODB_URI = process.env.NODE_ENV === 'production' 
-    ? 'mongodb://alemanApp:ALEMAN1988@127.0.0.1:27017/alemanChecker?authSource=admin'
+    ? 'mongodb://alemanApp:ALEMAN1988@127.0.0.1:27017/alemanChecker?authSource=alemanChecker'
     : 'mongodb://localhost:27017/alemanChecker';
 
 const MONGODB_OPTIONS = {
@@ -154,6 +154,21 @@ const SecurityBlockSchema = new mongoose.Schema({
 
 const SecurityBlock = mongoose.model('SecurityBlock', SecurityBlockSchema);
 
+// Crear schema para estadísticas
+const StatsSchema = new mongoose.Schema({
+    activeUsers: [String],
+    totalChecks: Number,
+    lives: Number,
+    lastUpdate: Date,
+    serverStatus: {
+        memory: Number,
+        cpu: Number,
+        uptime: Number
+    }
+});
+
+const Stats = mongoose.model('Stats', StatsSchema);
+
 // Definir los modelos en alemanChecker
 const User = mongoose.model('User', userSchema, 'users');
 const Key = mongoose.model('Key', keySchema, 'keys');
@@ -161,6 +176,7 @@ const Key = mongoose.model('Key', keySchema, 'keys');
 module.exports = {
     User,
     Key,
+    Stats,
     SecurityBlock,
     conectarDB
 }; 
