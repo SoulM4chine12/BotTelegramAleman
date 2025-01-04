@@ -27,7 +27,8 @@ const TELEGRAM_CONFIG = {
         token: process.env.TELEGRAM_BOT_TOKEN,
         chatId: process.env.TELEGRAM_CHAT_ID
     },
-    adminId: process.env.TELEGRAM_ADMIN_ID
+    // Array de IDs de admin
+    adminIds: process.env.TELEGRAM_ADMIN_IDS.split(',')
 };
 
 // Crear una única instancia del bot
@@ -611,13 +612,48 @@ const adminCommands = {
             console.error('Error en comando unblock:', error);
             adminBot.sendMessage(msg.chat.id, '❌ Error al desbloquear usuario');
         }
+    },
+    '/addadmin': async (msg, args) => {
+        try {
+            // Solo tú puedes agregar admins (usando tu ID original)
+            if (msg.from.id.toString() !== '6912929677') {
+                adminBot.sendMessage(msg.chat.id, '❌ Solo el Super Admin puede agregar administradores');
+                return;
+            }
+
+            if (!args[0]) {
+                adminBot.sendMessage(msg.chat.id, '❌ Uso: /addadmin <ID_TELEGRAM>');
+                return;
+            }
+
+            const newAdminId = args[0];
+            
+            // Agregar el nuevo admin a la lista
+            if (!TELEGRAM_CONFIG.adminIds.includes(newAdminId)) {
+                TELEGRAM_CONFIG.adminIds.push(newAdminId);
+                
+                const mensaje = `✅ *Nuevo Administrador Agregado*\n\n` +
+                    `🆔 ID: ${newAdminId}\n` +
+                    `📅 Fecha: ${new Date().toLocaleString()}\n` +
+                    `👑 Agregado por: @${msg.from.username}`;
+
+                adminBot.sendMessage(msg.chat.id, mensaje, {
+                    parse_mode: 'Markdown'
+                });
+            } else {
+                adminBot.sendMessage(msg.chat.id, '❌ Este ID ya es administrador');
+            }
+        } catch (error) {
+            console.error('Error agregando admin:', error);
+            adminBot.sendMessage(msg.chat.id, '❌ Error agregando administrador');
+        }
     }
 };
 
 // Procesar comandos administrativos
 adminBot.on('message', (msg) => {
-    if (msg.from.id.toString() !== TELEGRAM_CONFIG.adminId) {
-        console.log('Intento de acceso no autorizado al bot admin:', msg.from);
+    if (!isAdmin(msg.from.id)) {
+        console.log('Intento de acceso no autorizado:', msg.from);
         return;
     }
 
@@ -719,6 +755,11 @@ let botInstance = null;
         process.exit(1);
     }
 })();
+
+// Modificar la verificación de admin
+function isAdmin(userId) {
+    return TELEGRAM_CONFIG.adminIds.includes(userId.toString());
+}
 
 module.exports = {
     TELEGRAM_CONFIG,
