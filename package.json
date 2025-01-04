@@ -6,11 +6,12 @@
     "start": "NODE_ENV=production node utils/telegram.js"
   },
   "dependencies": {
-    "node-telegram-bot-api": "^0.61.0",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
     "mongoose": "^8.9.3",
-    "axios": "^1.7.9"
+    "node-telegram-bot-api": "^0.61.0"
   },
   "engines": {
     "node": ">=16.0.0"
   }
-} 
+}
