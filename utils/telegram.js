@@ -327,82 +327,63 @@ const adminCommands = {
     },
     '/genkey': async (msg, args) => {
         try {
-            let days;
-            const option = args[0]?.toLowerCase();
+            let days = 30; // Valor por defecto
+            let timeUnit = 'días';
 
-            // Opciones predefinidas
-            switch (option) {
-                case '15':
-                    days = 15;
-                    break;
-                case '30':
-                    days = 30;
-                    break;
-                case '60':
-                    days = 60;
-                    break;
-                case 'h':
-                case 'horas':
-                    // Si es por horas, convertir a días (ej: /genkey h 12)
-                    const hours = parseInt(args[1]) || 1;
-                    days = hours / 24;
-                    break;
-                case 'd':
-                case 'dias':
-                    // Días personalizados (ej: /genkey d 5)
-                    days = parseInt(args[1]) || 1;
-                    break;
-                default:
-                    // Si es un número directo
-                    days = parseInt(option) || 30;
+            if (args.length > 0) {
+                if (args[0] === 'h' && args[1]) {
+                    // Convertir horas a días
+                    days = parseFloat(args[1]) / 24;
+                    timeUnit = 'horas';
+                } else if (args[0] === 'd' && args[1]) {
+                    days = parseInt(args[1]);
+                } else {
+                    days = parseInt(args[0]);
+                }
             }
 
-            const key = crypto.randomBytes(16).toString('hex').toUpperCase();
-            
-            const newKey = new Key({
-                key: key,
-                createdAt: new Date(),
-                expiresAt: new Date(Date.now() + (days * 24 * 60 * 60 * 1000)),
-                daysValidity: days,
-                createdBy: {
-                    adminId: msg.from.id.toString(),
-                    adminUsername: msg.from.username,
-                    adminName: msg.from.first_name
-                }
+            // Validar el número de días
+            if (isNaN(days) || days <= 0) {
+                const helpMsg = `📝 *Uso del comando:*\n` +
+                    `/genkey 15 - Key de 15 días\n` +
+                    `/genkey 30 - Key de 30 días\n` +
+                    `/genkey 60 - Key de 60 días\n` +
+                    `/genkey h 12 - Key por horas (ej: 12 horas)\n` +
+                    `/genkey d 5 - Key por días específicos (ej: 5 días)`;
+                
+                adminBot.sendMessage(msg.chat.id, helpMsg, {
+                    parse_mode: 'Markdown'
+                });
+                return;
+            }
+
+            const key = await generateKey(days);
+            const admin = {
+                adminId: msg.from.id,
+                adminUsername: msg.from.username,
+                adminName: msg.from.first_name
+            };
+
+            // Actualizar la key con info del admin
+            await Key.findByIdAndUpdate(key._id, {
+                createdBy: admin
             });
 
-            await newKey.save();
-
-            // Formatear duración para el mensaje
-            let duracionMsg;
-            if (days < 1) {
-                duracionMsg = `${Math.round(days * 24)} horas`;
-            } else {
-                duracionMsg = `${days} días`;
-            }
-
             const mensaje = `🔑 *Nueva Key Generada*\n\n` +
-                `📌 Key: \`${key}\`\n` +
-                `⏰ Duración: ${duracionMsg}\n` +
-                `📅 Expira: ${newKey.expiresAt.toLocaleString()}\n` +
+                `📌 Key: \`${key.key}\`\n` +
+                `⏰ Duración: ${timeUnit === 'horas' ? `${days * 24} horas` : `${days} días`}\n` +
+                `📅 Expira: ${key.expiresAt.toLocaleString()}\n` +
                 `✨ Estado: Disponible\n` +
                 `👨‍💻 Creada por: @${msg.from.username}\n` +
                 `🆔 Admin ID: ${msg.from.id}`;
 
-            // Actualizar el mensaje de ayuda para mostrar el nuevo formato
-            const helpMsg = `*Uso del comando:*\n` +
-                `/genkey 15 - Key de 15 días\n` +
-                `/genkey 30 - Key de 30 días\n` +
-                `/genkey 60 - Key de 60 días\n` +
-                `/genkey h 12 - Key por horas (ej: 12 horas)\n` +
-                `/genkey d 5 - Key por días específicos (ej: 5 días)`;
-
-            await adminBot.sendMessage(msg.chat.id, mensaje, { parse_mode: 'Markdown' });
-            await adminBot.sendMessage(msg.chat.id, helpMsg, { parse_mode: 'Markdown' });
+            adminBot.sendMessage(msg.chat.id, mensaje, {
+                parse_mode: 'Markdown'
+            });
 
         } catch (error) {
-            adminBot.sendMessage(msg.chat.id, '❌ Error generando key');
             console.error('Error generando key:', error);
+            adminBot.sendMessage(msg.chat.id, '❌ Error generando key');
         }
     },
     '/keys': async (msg) => {
