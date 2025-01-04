@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 require('dotenv').config();
 
-// Configuración de conexiones (ofuscada)
+// Configuración de conexiones (usando variables de entorno de Render)
 const MONGODB_URI = `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASS}@${process.env.MONGODB_CLUSTER}/${process.env.MONGODB_DB}?retryWrites=true&w=majority&appName=AlemanChecker`;
 
 // Opciones de conexión actualizadas
@@ -14,11 +14,22 @@ const MONGODB_OPTIONS = {
 async function conectarDB() {
     try {
         console.log('🔄 Intentando conectar a MongoDB...');
-        await mongoose.connect(MONGODB_URI, MONGODB_OPTIONS);
+        
+        // Construir URI con verificación
+        const uri = process.env.MONGODB_URI || `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASS}@${process.env.MONGODB_CLUSTER}/${process.env.MONGODB_DB}`;
+        
+        console.log('📡 Conectando a:', uri.replace(/\/\/.*:.*@/, '//<credentials>@'));
+        
+        await mongoose.connect(uri, {
+            serverSelectionTimeoutMS: 5000,
+            retryWrites: true,
+            retryReads: true
+        });
+        
         console.log('✅ Conectado a MongoDB Atlas');
         return true;
     } catch (error) {
-        console.error('❌ Error conectando a MongoDB:', error);
+        console.error('❌ Error conectando a MongoDB:', error.message);
         return false;
     }
 }

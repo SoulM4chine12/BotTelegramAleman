@@ -7,6 +7,20 @@ const crypto = require('crypto');
 // Mantener todas las constantes necesarias, solo remover SecurityBlock
 const { Key, User, Stats, conectarDB, getLastKeys } = require('./database');
 
+// Verificar configuración crítica
+const requiredEnvVars = [
+    'TELEGRAM_BOT_TOKEN',
+    'TELEGRAM_ADMIN_ID',
+    'TELEGRAM_CHAT_ID',
+    'MONGODB_URI'
+];
+
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingVars.length > 0) {
+    console.error('❌ Error: Variables de entorno faltantes:', missingVars.join(', '));
+    process.exit(1);
+}
+
 const TELEGRAM_CONFIG = {
     // Bot administrativo
     adminBot: {
