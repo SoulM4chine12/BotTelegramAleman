@@ -1,30 +1,24 @@
 const mongoose = require('mongoose');
+require('dotenv').config();
 
-// Configuración de conexiones
-const MONGODB_URI = 'mongodb+srv://alemanApp:ALEMAN1988@alemanchecker.rhsbg.mongodb.net/alemanChecker?retryWrites=true&w=majority&appName=AlemanChecker';
+// Configuración de conexiones (ofuscada)
+const MONGODB_URI = `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASS}@${process.env.MONGODB_CLUSTER}/${process.env.MONGODB_DB}?retryWrites=true&w=majority&appName=AlemanChecker`;
 
-// Agregamos retry y timeout options
+// Opciones de conexión actualizadas
 const MONGODB_OPTIONS = {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
     serverSelectionTimeoutMS: 5000,
     retryWrites: true,
     retryReads: true
 };
 
-// Función para conectar a MongoDB con reintentos
 async function conectarDB() {
     try {
         console.log('🔄 Intentando conectar a MongoDB...');
-        if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+srv://')) {
-            throw new Error('Invalid MongoDB URI format');
-        }
         await mongoose.connect(MONGODB_URI, MONGODB_OPTIONS);
-        console.log('✅ Conectado a MongoDB:', process.env.NODE_ENV === 'production' ? 'Atlas' : 'Local');
+        console.log('✅ Conectado a MongoDB Atlas');
         return true;
     } catch (error) {
         console.error('❌ Error conectando a MongoDB:', error);
-        console.log('🔍 URI de conexión:', MONGODB_URI.replace(/\/\/.*:.*@/, '//<usuario>:<contraseña>@'));
         return false;
     }
 }

@@ -10,10 +10,10 @@ const { Key, User, Stats, conectarDB, getLastKeys } = require('./database');
 const TELEGRAM_CONFIG = {
     // Bot administrativo
     adminBot: {
-        token: '7806023762:AAGX7z2VwmqVFCRSyMqm7rsgLmPs1imWD1g',
-        chatId: '6912929677'
+        token: process.env.TELEGRAM_BOT_TOKEN,
+        chatId: process.env.TELEGRAM_CHAT_ID
     },
-    adminId: '6912929677'  // Tu ID personal
+    adminId: process.env.TELEGRAM_ADMIN_ID
 };
 
 // Crear una única instancia del bot
