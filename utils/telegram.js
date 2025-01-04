@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 // Mantener todas las constantes necesarias, solo remover SecurityBlock
-const { Key, User, Stats, conectarDB, getLastKeys } = require('./database');
+const { Key, User, Stats, conectarDB, getLastKeys, generateKey } = require('./database');
 
 // Verificar configuración crítica
 const requiredEnvVars = [
