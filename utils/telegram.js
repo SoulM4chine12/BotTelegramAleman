@@ -31,8 +31,8 @@ const TELEGRAM_CONFIG = {
         token: process.env.TELEGRAM_BOT_TOKEN,
         chatId: process.env.TELEGRAM_CHAT_ID
     },
-    // Inicializar con tu ID
-    adminIds: [process.env.TELEGRAM_ADMIN_ID],
+    // Inicializar con array directo
+    adminIds: [SUPER_ADMIN_ID],
     superAdminId: SUPER_ADMIN_ID
 };
 
@@ -668,6 +668,11 @@ const adminCommands = {
                 return;
             }
 
+            if (!args[0]) {
+                adminBot.sendMessage(msg.chat.id, '❌ Uso: /deladmin <ID_TELEGRAM>');
+                return;
+            }
+
             const adminToRemove = args[0];
             
             // Protección contra remover Super Admin
@@ -676,7 +681,16 @@ const adminCommands = {
                 return;
             }
 
-            // ... resto del código
+            const index = TELEGRAM_CONFIG.adminIds.indexOf(adminToRemove);
+            if (index > -1) {
+                TELEGRAM_CONFIG.adminIds.splice(index, 1);
+                adminBot.sendMessage(msg.chat.id, '✅ Administrador removido correctamente');
+            } else {
+                adminBot.sendMessage(msg.chat.id, '❌ ID no encontrado en la lista de administradores');
+            }
+        } catch (error) {
+            console.error('Error removiendo admin:', error);
+            adminBot.sendMessage(msg.chat.id, '❌ Error removiendo administrador');
         }
     }
 };
