@@ -131,10 +131,14 @@ function detectAttack(message, userId) {
                 `⚠️ Patrón: ${detectedPattern}\n` +
                 `⏰ Fecha: ${new Date().toLocaleString()}`;
 
-            // Enviar alerta al admin
-            adminBot.sendMessage(TELEGRAM_CONFIG.adminId, alertMsg, {
-                parse_mode: 'Markdown'
-            });
+            // Corregir el envío del mensaje
+            if (TELEGRAM_CONFIG.adminIds[0]) {  // Usar el primer admin (Super Admin)
+                adminBot.sendMessage(TELEGRAM_CONFIG.adminIds[0], alertMsg, {
+                    parse_mode: 'Markdown'
+                }).catch(error => {
+                    console.error('Error enviando alerta:', error.message);
+                });
+            }
 
             // Bloquear usuario
             blockUser(userId);
