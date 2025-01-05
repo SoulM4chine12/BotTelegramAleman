@@ -277,7 +277,10 @@ const adminCommands = {
             }
 
             // Obtener usuarios activos de MongoDB
-            const activeUsers = await getActiveUsers();
+            const activeUsers = await User.find({ 
+                'subscription.status': 'active',
+                'blockStatus.isBlocked': false
+            }).select('username subscription lastLogin createdAt');
 
             if (!activeUsers || activeUsers.length === 0) {
                 await adminBot.sendMessage(msg.chat.id, '❌ No hay usuarios activos');
@@ -354,7 +357,7 @@ const adminCommands = {
             `/help - Mostrar esta ayuda\n` +
             `/block <user> <24h|48h|week|permanent> [razón] - Bloquear usuario\n` +
             `/unblock <user> - Desbloquear usuario\n` +
-            `/lives <bin|user> <valor> - Buscar lives por BIN o usuario\n` +
+            `/lives [username] - Ver últimas lives (todas o por usuario)\n` +
             `${isSuperAdmin(msg.from.id) ? 
                 `\n👑 *Comandos Super Admin*\n` +
                 `/addadmin <ID> - Agregar nuevo admin\n` +
@@ -763,39 +766,23 @@ const adminCommands = {
                 return;
             }
 
-            if (!args || args.length < 2) {
-                const helpMsg = `❌ *Uso correcto:*\n` +
-                    `/lives bin <número_bin> - Buscar lives por BIN\n` +
-                    `/lives user <username> - Buscar lives por usuario`;
-                
-                await adminBot.sendMessage(msg.chat.id, helpMsg, {
-                    parse_mode: 'Markdown'
-                });
-                return;
-            }
-
-            const [tipo, valor] = args;
             let lives;
             let mensaje;
 
-            switch (tipo.toLowerCase()) {
-                case 'bin':
-                    lives = await Lives.find({ 'detalles.bin': valor })
-                        .sort({ fechaEncontrada: -1 })
-                        .limit(10);
-                    mensaje = `🔍 *Lives encontradas para BIN ${valor}*\n\n`;
-                    break;
-
-                case 'user':
-                    lives = await Lives.find({ 'checkedBy.username': valor })
-                        .sort({ fechaEncontrada: -1 })
-                        .limit(10);
-                    mensaje = `🔍 *Lives encontradas por usuario ${valor}*\n\n`;
-                    break;
-
-                default:
-                    await adminBot.sendMessage(msg.chat.id, '❌ Tipo de búsqueda inválido. Use "bin" o "user"');
-                    return;
+            // Si no hay argumentos, mostrar las últimas 10 lives generales
+            if (!args || args.length === 0) {
+                lives = await Lives.find()
+                    .sort({ fechaEncontrada: -1 })
+                    .limit(10);
+                mensaje = `🔍 *Últimas 10 Lives Encontradas*\n\n`;
+            } 
+            // Si hay un username, buscar por ese usuario
+            else {
+                const username = args[0];
+                lives = await Lives.find({ 'checkedBy.username': username })
+                    .sort({ fechaEncontrada: -1 })
+                    .limit(10);
+                mensaje = `🔍 *Lives encontradas por usuario ${username}*\n\n`;
             }
 
             if (!lives || lives.length === 0) {
@@ -810,6 +797,7 @@ const adminCommands = {
                 `🌍 *País:* ${live.detalles.pais}\n` +
                 `💠 *Nivel:* ${live.detalles.nivel}\n` +
                 `🔄 *Gate:* ${live.detalles.gate}\n` +
+                `👤 *Respuesta:* ${live.detalles.respuesta}\n` +
                 `👤 *Checker:* ${live.checkedBy.username}\n` +
                 `⏰ *Fecha:* ${new Date(live.fechaEncontrada).toLocaleString()}\n`
             ).join('\n───────────────\n\n');
