@@ -267,27 +267,45 @@ adminBot.onText(/\/start/, (msg) => {
 });
 
 // Comandos administrativos
-const adminCommands = {
-    '/users': async (msg) => {
-        try {
-            const activeUsers = global.activeUsers;
-            const mensaje = `👥 *Usuarios Activos (${activeUsers.size})*\n\n` +
-                Array.from(activeUsers.entries())
-                    .map(([user, lastActivity]) => {
-                        const time = new Date(lastActivity).toLocaleString();
-                        return `👤 *${user}*\n└ Última actividad: ${time}`;
-                    })
-                    .join('\n\n');
-            
-            adminBot.sendMessage(msg.chat.id, mensaje || '❌ No hay usuarios activos', {
-                parse_mode: 'Markdown'
-            });
-        } catch (error) {
-            console.error('Error en /users:', error);
-            adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo usuarios');
+'/users': async (msg) => {
+    try {
+        // Verificar si es admin
+        if (!isAdmin(msg.from.id)) {
+            await logUnauthorizedAccess(msg);
+            return;
         }
-    },
-    '/stats': async (msg) => {
+
+        // Obtener usuarios activos de MongoDB
+        const activeUsers = await User.find({ 
+            'subscription.status': 'active',
+            'blockStatus.isBlocked': false
+        }).select('username subscription lastLogin createdAt');
+
+        if (!activeUsers || activeUsers.length === 0) {
+            await adminBot.sendMessage(msg.chat.id, '❌ No hay usuarios activos');
+            return;
+        }
+
+        const mensaje = `👥 *Usuarios Activos (${activeUsers.length})*\n\n` +
+            activeUsers.map(user => {
+                const lastActivity = user.lastLogin || user.createdAt;
+                const diasRestantes = user.subscription?.daysValidity || 0;
+                
+                return `👤 *${user.username}*\n` +
+                    `├ Días: ${diasRestantes}\n` +
+                    `└ Última actividad: ${lastActivity.toLocaleString()}`;
+            }).join('\n\n');
+
+        await adminBot.sendMessage(msg.chat.id, mensaje, {
+            parse_mode: 'Markdown'
+        });
+
+    } catch (error) {
+        console.error('Error en comando /users:', error);
+        await adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo usuarios');
+
+
+        '/stats': async (msg) => {
         try {
             // Leer stats de MongoDB
             const stats = await Stats.findOne({}).sort({ lastUpdate: -1 });
