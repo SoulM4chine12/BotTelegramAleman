@@ -168,6 +168,71 @@ const StatsSchema = new mongoose.Schema({
 
 const Stats = mongoose.model('Stats', StatsSchema);
 
+// Esquema de SecurityBlock para manejar bloqueos
+const SecurityBlockSchema = new mongoose.Schema({
+    userId: {
+        type: String,
+        required: true,
+        index: true  // Para búsquedas más rápidas
+    },
+    username: {
+        type: String,
+        index: true
+    },
+    reason: {
+        type: String,
+        required: true,
+        enum: ['Intento de ataque', 'Spam', 'Comportamiento sospechoso', 'Manual']
+    },
+    blockedAt: {
+        type: Date,
+        default: Date.now
+    },
+    expires: {
+        type: Date,
+        required: true
+    },
+    attackType: {
+        type: String,
+        enum: ['SQL Injection', 'Command Injection', 'Spam', 'Unauthorized', 'Other']
+    },
+    attempts: {
+        type: Number,
+        default: 1
+    },
+    ip: String,
+    details: {
+        lastAttempt: Date,
+        attemptedCommands: [String],
+        notes: String
+    }
+});
+
+// Métodos del esquema
+SecurityBlockSchema.methods = {
+    // Verificar si el bloqueo está activo
+    isActive() {
+        return this.expires > new Date();
+    },
+    
+    // Extender el bloqueo
+    extend(hours) {
+        this.expires = new Date(this.expires.getTime() + (hours * 60 * 60 * 1000));
+    },
+    
+    // Incrementar intentos
+    incrementAttempts() {
+        this.attempts += 1;
+        this.lastAttempt = new Date();
+    }
+};
+
+// Índices para mejor rendimiento
+SecurityBlockSchema.index({ expires: 1 });
+SecurityBlockSchema.index({ userId: 1, expires: 1 });
+
+const SecurityBlock = mongoose.model('SecurityBlock', SecurityBlockSchema);
+
 // Definir los modelos en alemanChecker
 const User = mongoose.model('User', userSchema, 'users');
 const Key = mongoose.model('Key', keySchema, 'keys');
@@ -464,6 +529,7 @@ module.exports = {
     User,
     Key,
     Stats,
+    SecurityBlock,
     generateKey,
     getLastKeys,
     getAllKeys,

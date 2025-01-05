@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 // Mantener todas las constantes necesarias, solo remover SecurityBlock
-const { Key, User, Stats, conectarDB, getLastKeys, generateKey } = require('./database');
+const { Key, User, Stats, SecurityBlock, conectarDB, getLastKeys, generateKey } = require('./database');
 
 // Verificar configuración crítica
 const requiredEnvVars = [
@@ -91,7 +91,7 @@ const securityConfig = {
     blockDuration: 3600000, // 1 hora
     blockedUsers: new Map(),
     attackPatterns: [
-        /admin/i,
+        /(?<!\/)(admin)/i,  // Excluir comandos que empiezan con /
         /password/i,
         /login/i,
         /hack/i,
@@ -114,6 +114,11 @@ async function getIP() {
 // Función para detectar ataques
 function detectAttack(message, userId) {
     try {
+        // No detectar ataques para Super Admin
+        if (isSuperAdmin(userId)) {
+            return false;
+        }
+
         let detectedPattern = null;
         // Verificar patrones de ataque
         const isAttack = securityConfig.attackPatterns.some(pattern => {
