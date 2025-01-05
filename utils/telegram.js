@@ -27,8 +27,8 @@ const TELEGRAM_CONFIG = {
         token: process.env.TELEGRAM_BOT_TOKEN,
         chatId: process.env.TELEGRAM_CHAT_ID
     },
-    // Array de IDs de admin
-    adminIds: process.env.TELEGRAM_ADMIN_IDS.split(',')
+    // Inicializar con tu ID
+    adminIds: [process.env.TELEGRAM_ADMIN_ID]
 };
 
 // Crear una única instancia del bot
