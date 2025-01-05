@@ -524,6 +524,9 @@ async function updateStats(data) {
     }
 }
 
+// Agregar SecurityLog a los modelos exportados
+const SecurityLog = require('../models/SecurityLog');
+
 module.exports = {
     conectarDB,
     User,
@@ -539,5 +542,6 @@ module.exports = {
     blockUser,
     unblockUser,
     getStats,
-    updateStats
+    updateStats,
+    SecurityLog
 }; 

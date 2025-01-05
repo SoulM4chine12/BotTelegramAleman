@@ -6,6 +6,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 // Mantener todas las constantes necesarias, solo remover SecurityBlock
 const { Key, User, Stats, SecurityBlock, conectarDB, getLastKeys, generateKey } = require('./database');
+const SecurityLog = require('../models/SecurityLog');
 
 // Verificar configuración crítica
 const requiredEnvVars = [
@@ -701,6 +702,40 @@ const adminCommands = {
             console.error('Error removiendo admin:', error);
             adminBot.sendMessage(msg.chat.id, '❌ Error removiendo administrador');
         }
+    },
+    '/security': async (msg) => {
+        try {
+            if (!isAdmin(msg.from.id)) {
+                await logUnauthorizedAccess(msg);
+                return;
+            }
+
+            const intentos = await SecurityLog.find()
+                .sort({ timestamp: -1 })
+                .limit(10);
+
+            if (!intentos.length) {
+                await adminBot.sendMessage(msg.chat.id, '✅ No hay intentos de acceso no autorizados registrados', {
+                    parse_mode: 'Markdown'
+                });
+                return;
+            }
+
+            const mensaje = `🔒 *Últimos ${intentos.length} intentos de acceso no autorizados:*\n\n` +
+                intentos.map(intento => 
+                    `👤 Usuario: ${intento.username}\n` +
+                    `🆔 ID: ${intento.userId}\n` +
+                    `💬 Comando: ${intento.command}\n` +
+                    `⏰ Fecha: ${new Date(intento.timestamp).toLocaleString()}\n`
+                ).join('\n');
+
+            await adminBot.sendMessage(msg.chat.id, mensaje, {
+                parse_mode: 'Markdown'
+            });
+        } catch (error) {
+            console.error('Error en comando /security:', error);
+            await adminBot.sendMessage(msg.chat.id, '❌ Error al obtener el registro de seguridad');
+        }
     }
 };
 
@@ -720,36 +755,31 @@ adminBot.on('message', (msg) => {
     }
 });
 
-// Agregar comando para ver intentos de ataque
-adminBot.onText(/\/security/, async (msg) => {
-    if (msg.from.id.toString() !== TELEGRAM_CONFIG.adminId) return;
-
+// Función para registrar intentos de acceso no autorizados
+async function logUnauthorizedAccess(msg) {
     try {
-        const blocks = await SecurityBlock.find({
-            expires: { $gt: new Date() }  // Solo bloqueos activos
-        }).sort({ blockedAt: -1 });
+        // Guardar en la base de datos
+        await SecurityLog.create({
+            username: msg.from.username,
+            userId: msg.from.id,
+            command: msg.text
+        });
 
-        const blockedList = blocks.map(block => 
-            `👤 *Usuario:* ${block.username || block.userId}\n` +
-            `⏰ Bloqueado: ${block.blockedAt.toLocaleString()}\n` +
-            `⌛ Expira: ${block.expires.toLocaleString()}\n` +
-            `📝 Razón: ${block.reason}\n` +
-            `🔄 Intentos: ${block.attempts}\n` +
-            `🌐 IP: ${block.ip}\n`
-        ).join('\n');
+        const now = new Date();
+        const mensaje = `⚠️ *Acceso No Autorizado*\n` +
+                       `👤 Usuario: ${msg.from.username}\n` +
+                       `🆔 ID: ${msg.from.id}\n` + 
+                       `💬 Mensaje: ${msg.text}\n` +
+                       `⏰ Fecha: ${now.toLocaleString()}`;
 
-        const mensaje = `🛡️ *Reporte de Seguridad*\n\n` +
-            `📊 Usuarios bloqueados: ${blocks.length}\n\n` +
-            (blockedList || 'No hay usuarios bloqueados');
-
-        adminBot.sendMessage(msg.chat.id, mensaje, {
+        // Enviar notificación al admin
+        await adminBot.sendMessage(TELEGRAM_CONFIG.adminId, mensaje, {
             parse_mode: 'Markdown'
         });
     } catch (error) {
-        console.error('Error obteniendo reporte:', error);
-        adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo reporte de seguridad');
+        console.error('Error al registrar acceso no autorizado:', error);
     }
-});
+}
 
 // Agregar el servidor HTTP para mantenerlo activo en hosting
 if (process.env.NODE_ENV === 'production') {
