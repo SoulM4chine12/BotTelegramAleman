@@ -21,6 +21,10 @@ if (missingVars.length > 0) {
     process.exit(1);
 }
 
+// Constantes de seguridad
+const SUPER_ADMIN_ID = '6912929677';  // Tu ID hardcodeado
+const PROTECTED_IDS = [SUPER_ADMIN_ID];  // IDs que nunca pueden ser removidos
+
 const TELEGRAM_CONFIG = {
     // Bot administrativo
     adminBot: {
@@ -28,7 +32,8 @@ const TELEGRAM_CONFIG = {
         chatId: process.env.TELEGRAM_CHAT_ID
     },
     // Inicializar con tu ID
-    adminIds: [process.env.TELEGRAM_ADMIN_ID]
+    adminIds: [process.env.TELEGRAM_ADMIN_ID],
+    superAdminId: SUPER_ADMIN_ID
 };
 
 // Crear una única instancia del bot
@@ -320,7 +325,13 @@ const adminCommands = {
             `/security - Ver intentos de ataque\n` +
             `/help - Mostrar esta ayuda\n` +
             `/block <user> <24h|48h|week|permanent> [razón] - Bloquear usuario\n` +
-            `/unblock <user> - Desbloquear usuario`;
+            `/unblock <user> - Desbloquear usuario\n` +
+            `${isSuperAdmin(msg.from.id) ? 
+                `\n👑 *Comandos Super Admin*\n` +
+                `/addadmin <ID> - Agregar nuevo admin\n` +
+                `/deladmin <ID> - Remover admin\n` +
+                `/admins - Ver lista de admins\n`
+                : ''}`; // Solo mostrar comandos de admin si es super admin
         
         adminBot.sendMessage(msg.chat.id, help, {
             parse_mode: 'Markdown'
@@ -615,9 +626,11 @@ const adminCommands = {
     },
     '/addadmin': async (msg, args) => {
         try {
-            // Solo tú puedes agregar admins (usando tu ID original)
-            if (msg.from.id.toString() !== '6912929677') {
-                adminBot.sendMessage(msg.chat.id, '❌ Solo el Super Admin puede agregar administradores');
+            // Verificación estricta de Super Admin
+            if (!isSuperAdmin(msg.from.id)) {
+                adminBot.sendMessage(msg.chat.id, '⛔ Acceso denegado: Solo el Super Admin puede gestionar administradores');
+                // Logging de intento no autorizado
+                console.log(`🚨 Intento no autorizado de modificar admins por: ${msg.from.id}`);
                 return;
             }
 
@@ -646,6 +659,24 @@ const adminCommands = {
         } catch (error) {
             console.error('Error agregando admin:', error);
             adminBot.sendMessage(msg.chat.id, '❌ Error agregando administrador');
+        }
+    },
+    '/deladmin': async (msg, args) => {
+        try {
+            if (!isSuperAdmin(msg.from.id)) {
+                adminBot.sendMessage(msg.chat.id, '⛔ Acceso denegado');
+                return;
+            }
+
+            const adminToRemove = args[0];
+            
+            // Protección contra remover Super Admin
+            if (PROTECTED_IDS.includes(adminToRemove)) {
+                adminBot.sendMessage(msg.chat.id, '⚠️ No se puede remover al Super Admin');
+                return;
+            }
+
+            // ... resto del código
         }
     }
 };
@@ -759,6 +790,10 @@ let botInstance = null;
 // Modificar la verificación de admin
 function isAdmin(userId) {
     return TELEGRAM_CONFIG.adminIds.includes(userId.toString());
+}
+
+function isSuperAdmin(userId) {
+    return userId.toString() === SUPER_ADMIN_ID;
 }
 
 module.exports = {
