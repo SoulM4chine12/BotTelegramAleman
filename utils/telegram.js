@@ -267,45 +267,47 @@ adminBot.onText(/\/start/, (msg) => {
 });
 
 // Comandos administrativos
-'/users': async (msg) => {
-    try {
-        // Verificar si es admin
-        if (!isAdmin(msg.from.id)) {
-            await logUnauthorizedAccess(msg);
-            return;
+const adminCommands = {
+    '/users': async (msg) => {
+        try {
+            // Verificar si es admin
+            if (!isAdmin(msg.from.id)) {
+                await logUnauthorizedAccess(msg);
+                return;
+            }
+
+            // Obtener usuarios activos de MongoDB
+            const activeUsers = await User.find({ 
+                'subscription.status': 'active',
+                'blockStatus.isBlocked': false
+            }).select('username subscription lastLogin createdAt');
+
+            if (!activeUsers || activeUsers.length === 0) {
+                await adminBot.sendMessage(msg.chat.id, '❌ No hay usuarios activos');
+                return;
+            }
+
+            const mensaje = `👥 *Usuarios Activos (${activeUsers.length})*\n\n` +
+                activeUsers.map(user => {
+                    const lastActivity = user.lastLogin || user.createdAt;
+                    const diasRestantes = user.subscription?.daysValidity || 0;
+                    
+                    return `👤 *${user.username}*\n` +
+                        `├ Días: ${diasRestantes}\n` +
+                        `└ Última actividad: ${lastActivity.toLocaleString()}`;
+                }).join('\n\n');
+
+            await adminBot.sendMessage(msg.chat.id, mensaje, {
+                parse_mode: 'Markdown'
+            });
+
+        } catch (error) {
+            console.error('Error en comando /users:', error);
+            await adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo usuarios');
         }
+    },
 
-        // Obtener usuarios activos de MongoDB
-        const activeUsers = await User.find({ 
-            'subscription.status': 'active',
-            'blockStatus.isBlocked': false
-        }).select('username subscription lastLogin createdAt');
-
-        if (!activeUsers || activeUsers.length === 0) {
-            await adminBot.sendMessage(msg.chat.id, '❌ No hay usuarios activos');
-            return;
-        }
-
-        const mensaje = `👥 *Usuarios Activos (${activeUsers.length})*\n\n` +
-            activeUsers.map(user => {
-                const lastActivity = user.lastLogin || user.createdAt;
-                const diasRestantes = user.subscription?.daysValidity || 0;
-                
-                return `👤 *${user.username}*\n` +
-                    `├ Días: ${diasRestantes}\n` +
-                    `└ Última actividad: ${lastActivity.toLocaleString()}`;
-            }).join('\n\n');
-
-        await adminBot.sendMessage(msg.chat.id, mensaje, {
-            parse_mode: 'Markdown'
-        });
-
-    } catch (error) {
-        console.error('Error en comando /users:', error);
-        await adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo usuarios');
-
-
-        '/stats': async (msg) => {
+    '/stats': async (msg) => {
         try {
             // Leer stats de MongoDB
             const stats = await Stats.findOne({}).sort({ lastUpdate: -1 });
@@ -341,6 +343,7 @@ adminBot.onText(/\/start/, (msg) => {
             adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo estadísticas');
         }
     },
+
     '/help': (msg) => {
         const help = `🤖 *Comandos Administrativos*\n\n` +
             `/users - Ver usuarios activos\n` +
