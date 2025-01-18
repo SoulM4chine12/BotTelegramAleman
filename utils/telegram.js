@@ -854,10 +854,10 @@ const adminCommands = {
             }
 
             const username = args[0];
-            const dias = parseInt(args[1]);
+            const diasNuevos = parseInt(args[1]);
 
             // Validar número de días
-            if (isNaN(dias) || dias <= 0) {
+            if (isNaN(diasNuevos) || diasNuevos <= 0) {
                 await adminBot.sendMessage(msg.chat.id, '❌ El número de días debe ser un número positivo');
                 return;
             }
@@ -869,10 +869,17 @@ const adminCommands = {
                 return;
             }
 
+            // Calcular días restantes actuales
+            const diasRestantes = user.subscription?.endDate ? 
+                Math.ceil((user.subscription.endDate - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+
+            // Sumar los días nuevos a los restantes
+            const diasTotales = Math.max(0, diasRestantes) + diasNuevos;
+            
             // Calcular nueva fecha de expiración
             const startDate = new Date();
             const endDate = new Date();
-            endDate.setDate(endDate.getDate() + dias);
+            endDate.setDate(endDate.getDate() + diasTotales);
 
             // Actualizar suscripción
             await User.updateOne(
@@ -881,7 +888,7 @@ const adminCommands = {
                     $set: {
                         'subscription.startDate': startDate,
                         'subscription.endDate': endDate,
-                        'subscription.daysValidity': dias,
+                        'subscription.daysValidity': diasTotales,
                         'subscription.status': 'active'
                     }
                 }
@@ -890,8 +897,10 @@ const adminCommands = {
             // Enviar confirmación
             const mensaje = `✅ *Días agregados correctamente*\n\n` +
                 `👤 Usuario: ${username}\n` +
-                `📅 Días agregados: ${dias}\n` +
-                `📆 Expira: ${endDate.toLocaleString()}\n` +
+                `📅 Días anteriores: ${Math.max(0, diasRestantes)}\n` +
+                `📈 Días agregados: ${diasNuevos}\n` +
+                `📊 Días totales: ${diasTotales}\n` +
+                `📆 Nueva expiración: ${endDate.toLocaleString()}\n` +
                 `✨ Estado: Activo`;
 
             await adminBot.sendMessage(msg.chat.id, mensaje, {
@@ -979,7 +988,7 @@ process.on('unhandledRejection', (err) => {
 // Al inicio, después de inicializar el bot
 async function initializeBot() {
     try {
-        console.log('�� Bot Administrativo iniciado en modo', process.env.NODE_ENV || 'desarrollo');
+        console.log('🤖 Bot Administrativo iniciado en modo', process.env.NODE_ENV || 'desarrollo');
         
         // Intentar conectar a MongoDB
         const dbConnected = await conectarDB();
