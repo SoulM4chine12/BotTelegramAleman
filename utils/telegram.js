@@ -362,6 +362,7 @@ const adminCommands = {
             `/lives [username] - Ver últimas lives (todas o por usuario)\n` +
             `/adddays <username> <días> - Agregar días a un usuario\n` +
             `/user <username> - Ver datos de un usuario específico\n` +
+            `/deluser <username> - Eliminar usuario y sus datos\n` +
             `${isSuperAdmin(msg.from.id) ? 
                 `\n👑 *Comandos Super Admin*\n` +
                 `/addadmin <ID> - Agregar nuevo admin\n` +
@@ -970,6 +971,53 @@ const adminCommands = {
             console.error('Error en comando /user:', error);
             await adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo datos del usuario');
         }
+    },
+    '/deluser': async (msg, args) => {
+        try {
+            if (!isAdmin(msg.from.id)) {
+                await logUnauthorizedAccess(msg);
+                return;
+            }
+
+            // Verificar argumentos
+            if (!args || args.length < 1) {
+                await adminBot.sendMessage(msg.chat.id, 
+                    '❌ *Uso correcto:*\n' +
+                    '/deluser <username>\n' +
+                    'Ejemplo: /deluser usuario', {
+                    parse_mode: 'Markdown'
+                });
+                return;
+            }
+
+            const username = args[0];
+
+            // Buscar usuario antes de eliminar para confirmar
+            const user = await User.findOne({ username: username });
+            if (!user) {
+                await adminBot.sendMessage(msg.chat.id, '❌ Usuario no encontrado');
+                return;
+            }
+
+            // Eliminar usuario
+            const result = await User.deleteOne({ username: username });
+
+            if (result.deletedCount === 1) {
+                const mensaje = `✅ *Usuario eliminado correctamente*\n\n` +
+                    `👤 Username: ${username}\n` +
+                    `📅 Fecha: ${new Date().toLocaleString()}`;
+
+                await adminBot.sendMessage(msg.chat.id, mensaje, {
+                    parse_mode: 'Markdown'
+                });
+            } else {
+                await adminBot.sendMessage(msg.chat.id, '❌ Error al eliminar el usuario');
+            }
+
+        } catch (error) {
+            console.error('Error en comando /deluser:', error);
+            await adminBot.sendMessage(msg.chat.id, '❌ Error al eliminar el usuario');
+        }
     }
 };
 
@@ -1022,7 +1070,7 @@ if (process.env.NODE_ENV === 'production') {
         res.end('Bot Administrativo Activo');
     }).listen(process.env.PORT || 3000);
 
-    console.log('�� Bot Administrativo iniciado en modo producción');
+    console.log(' Bot Administrativo iniciado en modo producción');
 }
 
 // Manejar errores para evitar caídas
