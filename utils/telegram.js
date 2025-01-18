@@ -363,6 +363,7 @@ const adminCommands = {
             `/adddays <username> <días> - Agregar días a un usuario\n` +
             `/user <username> - Ver datos de un usuario específico\n` +
             `/deluser <username> - Eliminar usuario y sus datos\n` +
+            `/expired - Ver usuarios con suscripción expirada\n` +
             `${isSuperAdmin(msg.from.id) ? 
                 `\n👑 *Comandos Super Admin*\n` +
                 `/addadmin <ID> - Agregar nuevo admin\n` +
@@ -1017,6 +1018,52 @@ const adminCommands = {
         } catch (error) {
             console.error('Error en comando /deluser:', error);
             await adminBot.sendMessage(msg.chat.id, '❌ Error al eliminar el usuario');
+        }
+    },
+    '/expired': async (msg) => {
+        try {
+            if (!isAdmin(msg.from.id)) {
+                await logUnauthorizedAccess(msg);
+                return;
+            }
+
+            // Buscar usuarios con suscripción expirada o sin días
+            const expiredUsers = await User.find({
+                $or: [
+                    { 'subscription.endDate': { $lt: new Date() } },
+                    { 'subscription.endDate': null },
+                    { 'subscription.daysValidity': { $lte: 0 } },
+                    { 'subscription.daysValidity': null }
+                ]
+            }).sort({ 'subscription.endDate': 1 });
+
+            if (!expiredUsers || expiredUsers.length === 0) {
+                await adminBot.sendMessage(msg.chat.id, '✅ No hay usuarios con suscripción expirada');
+                return;
+            }
+
+            // Crear mensaje con la lista de usuarios
+            let mensaje = `🕒 *Usuarios con Suscripción Expirada*\n` +
+                `📊 Total: ${expiredUsers.length}\n\n`;
+
+            for (const user of expiredUsers) {
+                const diasRestantes = user.subscription?.endDate ? 
+                    Math.ceil((user.subscription.endDate - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+
+                mensaje += `👤 *${user.username}*\n` +
+                    `📅 Expiró: ${user.subscription?.endDate?.toLocaleString() || 'Sin fecha'}\n` +
+                    `📉 Días restantes: ${diasRestantes}\n` +
+                    `✨ Estado: ${user.subscription?.status || 'inactivo'}\n` +
+                    `───────────────\n`;
+            }
+
+            await adminBot.sendMessage(msg.chat.id, mensaje, {
+                parse_mode: 'Markdown'
+            });
+
+        } catch (error) {
+            console.error('Error en comando /expired:', error);
+            await adminBot.sendMessage(msg.chat.id, '❌ Error buscando usuarios expirados');
         }
     }
 };
