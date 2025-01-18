@@ -346,27 +346,30 @@ const adminCommands = {
     },
 
     '/help': (msg) => {
-        const help = `🤖 *Comandos Administrativos*\n\n` +
+        const helpMessage = 
+            `🤖 *Comandos Disponibles*\n\n` +
             `/users - Ver usuarios activos\n` +
             `/stats - Ver estadísticas\n` +
-            `/genkey [días] - Generar nueva key\n` +
+            `/genkey días - Generar nueva key\n` +
             `/keys - Ver últimas keys\n` +
             `/allkeys - Ver todas las keys\n` +
             `/allusers - Ver todos los usuarios\n` +
-            `/delkey [key] - Eliminar una key\n` +
+            `/delkey key - Eliminar una key\n` +
             `/security - Ver intentos de ataque\n` +
             `/help - Mostrar esta ayuda\n` +
-            `/block <user> <24h|48h|week|permanent> [razón] - Bloquear usuario\n` +
+            `/block <user> <24h|48h|week|permanent> razón - Bloquear usuario\n` +
             `/unblock <user> - Desbloquear usuario\n` +
             `/lives [username] - Ver últimas lives (todas o por usuario)\n` +
+            `/adddays <username> <días> - Agregar días a un usuario\n` +
             `${isSuperAdmin(msg.from.id) ? 
                 `\n👑 *Comandos Super Admin*\n` +
                 `/addadmin <ID> - Agregar nuevo admin\n` +
                 `/deladmin <ID> - Remover admin\n` +
-                `/admins - Ver lista de admins\n`
-                : ''}`; // Solo mostrar comandos de admin si es super admin
+                `/admins - Ver lista de admins` : 
+                ''
+            }`;
         
-        adminBot.sendMessage(msg.chat.id, help, {
+        adminBot.sendMessage(msg.chat.id, helpMessage, {
             parse_mode: 'Markdown'
         });
     },
@@ -831,6 +834,74 @@ const adminCommands = {
                 chat_id: msg.chat.id
             });
         }
+    },
+    '/adddays': async (msg, args) => {
+        try {
+            if (!isAdmin(msg.from.id)) {
+                await logUnauthorizedAccess(msg);
+                return;
+            }
+
+            // Verificar argumentos
+            if (!args || args.length < 2) {
+                await adminBot.sendMessage(msg.chat.id, 
+                    '❌ *Uso correcto:*\n' +
+                    '/adddays <username> <días>\n' +
+                    'Ejemplo: /adddays usuario 30', {
+                    parse_mode: 'Markdown'
+                });
+                return;
+            }
+
+            const username = args[0];
+            const dias = parseInt(args[1]);
+
+            // Validar número de días
+            if (isNaN(dias) || dias <= 0) {
+                await adminBot.sendMessage(msg.chat.id, '❌ El número de días debe ser un número positivo');
+                return;
+            }
+
+            // Buscar usuario en la base de datos
+            const user = await User.findOne({ username: username });
+            if (!user) {
+                await adminBot.sendMessage(msg.chat.id, '❌ Usuario no encontrado');
+                return;
+            }
+
+            // Calcular nueva fecha de expiración
+            const startDate = new Date();
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() + dias);
+
+            // Actualizar suscripción
+            await User.updateOne(
+                { username: username },
+                { 
+                    $set: {
+                        'subscription.startDate': startDate,
+                        'subscription.endDate': endDate,
+                        'subscription.daysValidity': dias,
+                        'subscription.status': 'active'
+                    }
+                }
+            );
+
+            // Enviar confirmación
+            const mensaje = `✅ *Días agregados correctamente*\n\n` +
+                `👤 Usuario: ${username}\n` +
+                `📅 Días agregados: ${dias}\n` +
+                `📆 Expira: ${endDate.toLocaleString()}\n` +
+                `✨ Estado: Activo`;
+
+            await adminBot.sendMessage(msg.chat.id, mensaje, {
+                parse_mode: 'Markdown'
+            });
+
+        } catch (error) {
+            console.error('Error en comando /adddays:', error);
+            await adminBot.sendMessage(msg.chat.id, '❌ Error agregando días al usuario');
+        }
     }
 };
 
@@ -908,7 +979,7 @@ process.on('unhandledRejection', (err) => {
 // Al inicio, después de inicializar el bot
 async function initializeBot() {
     try {
-        console.log('🤖 Bot Administrativo iniciado en modo', process.env.NODE_ENV || 'desarrollo');
+        console.log('�� Bot Administrativo iniciado en modo', process.env.NODE_ENV || 'desarrollo');
         
         // Intentar conectar a MongoDB
         const dbConnected = await conectarDB();
