@@ -361,6 +361,7 @@ const adminCommands = {
             `/unblock <user> - Desbloquear usuario\n` +
             `/lives [username] - Ver últimas lives (todas o por usuario)\n` +
             `/adddays <username> <días> - Agregar días a un usuario\n` +
+            `/user <username> - Ver datos de un usuario específico\n` +
             `${isSuperAdmin(msg.from.id) ? 
                 `\n👑 *Comandos Super Admin*\n` +
                 `/addadmin <ID> - Agregar nuevo admin\n` +
@@ -911,6 +912,64 @@ const adminCommands = {
             console.error('Error en comando /adddays:', error);
             await adminBot.sendMessage(msg.chat.id, '❌ Error agregando días al usuario');
         }
+    },
+    '/user': async (msg, args) => {
+        try {
+            if (!isAdmin(msg.from.id)) {
+                await logUnauthorizedAccess(msg);
+                return;
+            }
+
+            // Verificar argumentos
+            if (!args || args.length < 1) {
+                await adminBot.sendMessage(msg.chat.id, 
+                    '❌ *Uso correcto:*\n' +
+                    '/user <username>\n' +
+                    'Ejemplo: /user chuchu', {
+                    parse_mode: 'Markdown'
+                });
+                return;
+            }
+
+            const username = args[0];
+
+            // Buscar usuario en la base de datos
+            const user = await User.findOne({ username: username });
+            if (!user) {
+                await adminBot.sendMessage(msg.chat.id, '❌ Usuario no encontrado');
+                return;
+            }
+
+            // Calcular días restantes
+            const diasRestantes = user.subscription?.endDate ? 
+                Math.ceil((user.subscription.endDate - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+
+            // Crear mensaje con los datos del usuario
+            const mensaje = `🔍 *Datos del Usuario*\n\n` +
+                `👤 Username: ${user.username}\n` +
+                `📅 Fecha registro: ${user.createdAt?.toLocaleString()}\n` +
+                `⏰ Último login: ${user.lastLogin?.toLocaleString()}\n\n` +
+                `📊 *Suscripción*\n` +
+                `📈 Días válidos: ${user.subscription?.daysValidity || 0}\n` +
+                `📉 Días restantes: ${diasRestantes}\n` +
+                `📆 Expira: ${user.subscription?.endDate?.toLocaleString()}\n` +
+                `✨ Estado: ${user.subscription?.status || 'inactivo'}\n\n` +
+                `🔒 *Estado*\n` +
+                `${user.blockStatus?.isBlocked ? 
+                    `🚫 Bloqueado: Sí\n` +
+                    `📝 Razón: ${user.blockStatus.reason}\n` +
+                    `⏳ Tipo: ${user.blockStatus.blockType}\n` +
+                    `📅 Hasta: ${user.blockStatus.blockedUntil?.toLocaleString()}\n` 
+                    : '✅ No bloqueado'}`;
+
+            await adminBot.sendMessage(msg.chat.id, mensaje, {
+                parse_mode: 'Markdown'
+            });
+
+        } catch (error) {
+            console.error('Error en comando /user:', error);
+            await adminBot.sendMessage(msg.chat.id, '❌ Error obteniendo datos del usuario');
+        }
     }
 };
 
@@ -963,7 +1022,7 @@ if (process.env.NODE_ENV === 'production') {
         res.end('Bot Administrativo Activo');
     }).listen(process.env.PORT || 3000);
 
-    console.log('🤖 Bot Administrativo iniciado en modo producción');
+    console.log('�� Bot Administrativo iniciado en modo producción');
 }
 
 // Manejar errores para evitar caídas
